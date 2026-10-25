@@ -4,14 +4,14 @@ import pytest
 from fastapi import BackgroundTasks, FastAPI, HTTPException
 from fastapi.testclient import TestClient
 
-from telepy import EntryType
-from telepy.integrations.fastapi import init_telepy
+from tracefox import EntryType
+from tracefox.integrations.fastapi import init_tracefox
 
 
 @pytest.fixture
-def app(telepy):
+def app(tracefox):
     app = FastAPI()
-    init_telepy(app, telepy)
+    init_tracefox(app, tracefox)
 
     @app.get("/items/{item_id}")
     def read_item(item_id: int, q: str = ""):
@@ -93,44 +93,44 @@ def test_background_task_is_recorded_as_processed_job(client, entries):
 
 
 def test_dashboard_requests_are_not_recorded(client, entries):
-    assert client.get("/telepy").status_code == 200
-    assert client.get("/telepy/requests").status_code == 200
+    assert client.get("/tracefox").status_code == 200
+    assert client.get("/tracefox/requests").status_code == 200
     assert entries(EntryType.REQUEST) == []
 
 
-def test_dashboard_api(client, entries, telepy):
+def test_dashboard_api(client, entries, tracefox):
     client.get("/items/1")
-    data = client.get("/telepy/api/entries/request").json()
+    data = client.get("/tracefox/api/entries/request").json()
     assert len(data["entries"]) == 1
     uuid = data["entries"][0]["id"]
-    show = client.get(f"/telepy/api/entries/request/{uuid}").json()
+    show = client.get(f"/tracefox/api/entries/request/{uuid}").json()
     assert show["entry"]["id"] == uuid
     assert [e["type"] for e in show["batch"]] == ["log"]
-    assert client.get("/telepy/api/status").json()["counts"]["request"] == 1
+    assert client.get("/tracefox/api/status").json()["counts"]["request"] == 1
 
-    assert client.post("/telepy/api/toggle-recording").status_code == 419
-    headers = {"X-Telepy-Request": "1"}
-    assert client.post("/telepy/api/toggle-recording", headers=headers).json() == {"recording": False}
+    assert client.post("/tracefox/api/toggle-recording").status_code == 419
+    headers = {"X-Tracefox-Request": "1"}
+    assert client.post("/tracefox/api/toggle-recording", headers=headers).json() == {"recording": False}
     client.get("/items/2")
     assert len(entries(EntryType.REQUEST)) == 1
-    client.post("/telepy/api/toggle-recording", headers=headers)
+    client.post("/tracefox/api/toggle-recording", headers=headers)
 
-    assert client.post("/telepy/api/monitored-tags", json={"tag": "Auth:1"}, headers=headers).json() == {"tags": ["Auth:1"]}
-    assert client.request("DELETE", "/telepy/api/monitored-tags", json={"tag": "Auth:1"}, headers=headers).json() == {"tags": []}
-    assert client.request("DELETE", "/telepy/api/entries", headers=headers).status_code == 200
+    assert client.post("/tracefox/api/monitored-tags", json={"tag": "Auth:1"}, headers=headers).json() == {"tags": ["Auth:1"]}
+    assert client.request("DELETE", "/tracefox/api/monitored-tags", json={"tag": "Auth:1"}, headers=headers).json() == {"tags": []}
+    assert client.request("DELETE", "/tracefox/api/entries", headers=headers).status_code == 200
     assert [e["type"] for e in entries()] == ["client_request"]  # the TestClient's own DELETE call
 
 
 def test_static_assets_and_spa_routes(client):
-    assert client.get("/telepy/static/app.js").headers["content-type"].startswith("text/javascript")
-    page = client.get("/telepy/exceptions/abc")
+    assert client.get("/tracefox/static/app.js").headers["content-type"].startswith("text/javascript")
+    page = client.get("/tracefox/exceptions/abc")
     assert page.status_code == 200
-    assert '"path": "/telepy"' in page.text
+    assert '"path": "/tracefox"' in page.text
 
 
-def test_dashboard_is_forbidden_outside_local_without_authorization(client, telepy):
-    telepy.config.environment = "production"
-    assert client.get("/telepy").status_code == 403
-    assert client.get("/telepy/api/entries/request").status_code == 403
-    telepy.config.authorization = lambda request: request.headers.get("x-admin") == "yes"
-    assert client.get("/telepy/api/entries/request", headers={"x-admin": "yes"}).status_code == 200
+def test_dashboard_is_forbidden_outside_local_without_authorization(client, tracefox):
+    tracefox.config.environment = "production"
+    assert client.get("/tracefox").status_code == 403
+    assert client.get("/tracefox/api/entries/request").status_code == 403
+    tracefox.config.authorization = lambda request: request.headers.get("x-admin") == "yes"
+    assert client.get("/tracefox/api/entries/request", headers={"x-admin": "yes"}).status_code == 200

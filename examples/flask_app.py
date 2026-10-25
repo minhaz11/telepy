@@ -1,7 +1,7 @@
 """Demo Flask app.
 
-    TELEPY_ENV=local flask --app examples.flask_app run
-    open http://127.0.0.1:5000/telepy
+    TRACEFOX_ENV=local flask --app examples.flask_app run
+    open http://127.0.0.1:5000/tracefox
 """
 
 import logging
@@ -9,13 +9,13 @@ import logging
 from flask import Flask, render_template_string, session
 from sqlalchemy import create_engine, text
 
-from telepy import dump, telepy
-from telepy.integrations.flask import FlaskTelepy
+from tracefox import dump, tracefox
+from tracefox.integrations.flask import FlaskTracefox
 
 app = Flask(__name__)
 app.secret_key = "dev"
-app.config["TELEPY"] = {"database_url": "sqlite:///telepy-flask.sqlite3"}
-FlaskTelepy(app)
+app.config["TRACEFOX"] = {"database_url": "sqlite:///tracefox-flask.sqlite3"}
+FlaskTracefox(app)
 
 engine = create_engine("sqlite:///demo-flask.sqlite3")
 logger = logging.getLogger("flask-demo")
@@ -28,7 +28,7 @@ def index():
         now = conn.execute(text("select datetime('now')")).scalar()
     logger.info("Index visited %s times", session["visits"])
     dump({"visits": session["visits"], "now": now})
-    telepy.record_event("page.viewed", {"page": "index"})
+    tracefox.record_event("page.viewed", {"page": "index"})
     return render_template_string("<h1>Hello from Flask</h1><p>Server time: {{ now }}</p>", now=now)
 
 

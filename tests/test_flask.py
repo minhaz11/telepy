@@ -1,15 +1,15 @@
 import pytest
 from flask import Flask, render_template_string, session
 
-from telepy import EntryType
-from telepy.integrations.flask import FlaskTelepy
+from tracefox import EntryType
+from tracefox.integrations.flask import FlaskTracefox
 
 
 @pytest.fixture
-def app(telepy):
+def app(tracefox):
     app = Flask(__name__)
     app.secret_key = "test"
-    FlaskTelepy(app, telepy)
+    FlaskTracefox(app, tracefox)
 
     @app.route("/hello/<name>", methods=["GET", "POST"])
     def hello(name):
@@ -68,9 +68,9 @@ def test_exception_is_recorded_in_request_batch(client, entries):
 
 def test_dashboard_and_api(client, entries):
     client.get("/hello/x")
-    assert client.get("/telepy").status_code == 200
-    assert client.get("/telepy/requests/abc").status_code == 200
-    data = client.get("/telepy/api/entries/request").get_json()
+    assert client.get("/tracefox").status_code == 200
+    assert client.get("/tracefox/requests/abc").status_code == 200
+    data = client.get("/tracefox/api/entries/request").get_json()
     assert len(data["entries"]) == 1
     assert len(entries(EntryType.REQUEST)) == 1
 
@@ -78,5 +78,5 @@ def test_dashboard_and_api(client, entries):
 def test_cli_commands(app, client, entries):
     client.get("/hello/x")
     runner = app.test_cli_runner()
-    assert "entries pruned" in runner.invoke(args=["telepy", "prune", "--hours", "0"]).output
+    assert "entries pruned" in runner.invoke(args=["tracefox", "prune", "--hours", "0"]).output
     assert entries(EntryType.REQUEST) == []

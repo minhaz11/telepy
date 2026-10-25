@@ -8,7 +8,7 @@ import pytest
 import sqlalchemy as sa
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column
 
-from telepy import EntryType
+from tracefox import EntryType
 
 
 class Base(DeclarativeBase):
@@ -28,24 +28,24 @@ def engine():
     return engine
 
 
-def test_queries_are_recorded_with_bindings_location_and_slow_tag(telepy, entries, engine):
-    telepy.watcher("queries").options["slow"] = 0
+def test_queries_are_recorded_with_bindings_location_and_slow_tag(tracefox, entries, engine):
+    tracefox.watcher("queries").options["slow"] = 0
     with engine.connect() as conn:
         conn.execute(sa.text("select :name as n, :age as a"), {"name": "O'Brien", "age": 3})
     query = entries(EntryType.QUERY)[0]
     assert query["content"]["sql"] == "select 'O''Brien' as n, 3 as a"
     assert query["content"]["slow"] is True
     assert query["content"]["file"].endswith("test_watchers.py")
-    assert telepy.storage.find(query["id"])["tags"] == ["slow"]
+    assert tracefox.storage.find(query["id"])["tags"] == ["slow"]
 
 
-def test_telepy_own_queries_are_not_recorded(telepy, entries):
-    telepy.storage.monitored_tags()
+def test_tracefox_own_queries_are_not_recorded(tracefox, entries):
+    tracefox.storage.monitored_tags()
     assert entries(EntryType.QUERY) == []
 
 
-def test_sqlalchemy_model_events_and_hydrations(telepy, entries, engine):
-    with telepy.batch():
+def test_sqlalchemy_model_events_and_hydrations(tracefox, entries, engine):
+    with tracefox.batch():
         with Session(engine) as session:
             book = Book(title="Dune")
             session.add(book)
@@ -64,7 +64,7 @@ def test_sqlalchemy_model_events_and_hydrations(telepy, entries, engine):
     assert actions["retrieved"]["count"] >= 1
 
 
-def test_logs_and_exceptions_from_logging(telepy, entries):
+def test_logs_and_exceptions_from_logging(tracefox, entries):
     log = logging.getLogger("tests.app")
     log.info("user %s signed in", "ada", extra={"ip": "127.0.0.1"})
     try:
@@ -82,15 +82,15 @@ def test_logs_and_exceptions_from_logging(telepy, entries):
     assert exception["line_preview"]
 
 
-def test_exception_is_recorded_once(telepy, entries):
+def test_exception_is_recorded_once(tracefox, entries):
     exc = RuntimeError("once")
-    telepy.watcher("exceptions").record_exception(exc)
-    telepy.watcher("exceptions").record_exception(exc)
+    tracefox.watcher("exceptions").record_exception(exc)
+    tracefox.watcher("exceptions").record_exception(exc)
     assert len(entries(EntryType.EXCEPTION, family_hash=None)) == 1
 
 
-def test_httpx_sync_and_async_clients(telepy, entries):
-    telepy.hide_response_parameters("token")
+def test_httpx_sync_and_async_clients(tracefox, entries):
+    tracefox.hide_response_parameters("token")
 
     def handler(request):
         return httpx.Response(201, json={"ok": True, "token": "secret"})
@@ -112,7 +112,7 @@ def test_httpx_sync_and_async_clients(telepy, entries):
     assert post["response"] == {"ok": True, "token": "********"}
 
 
-def test_requests_library(telepy, entries):
+def test_requests_library(tracefox, entries):
     import requests
 
     class Handler(BaseHTTPRequestHandler):
@@ -137,7 +137,7 @@ def test_requests_library(telepy, entries):
     assert row["response_status"] == 200
 
 
-def test_redis_commands_and_pipelines(telepy, entries):
+def test_redis_commands_and_pipelines(tracefox, entries):
     fakeredis = pytest.importorskip("fakeredis")
     client = fakeredis.FakeRedis()
     client.set("greeting", "hello")
@@ -149,7 +149,7 @@ def test_redis_commands_and_pipelines(telepy, entries):
     assert any(c.startswith("PIPELINE INCRBY n 1; EXPIRE n 10") for c in commands)
 
 
-def test_jinja_views(telepy, entries):
+def test_jinja_views(tracefox, entries):
     from jinja2 import DictLoader, Environment
 
     env = Environment(loader=DictLoader({"hello.html": "Hi {{ name }}"}))
@@ -159,7 +159,7 @@ def test_jinja_views(telepy, entries):
     assert view["data"] == ["name", "role"]
 
 
-def test_blinker_events(telepy, entries):
+def test_blinker_events(tracefox, entries):
     from blinker import Namespace
 
     signals = Namespace()
@@ -176,30 +176,30 @@ def test_blinker_events(telepy, entries):
     assert event["listeners"][0]["name"].endswith("notify")
 
 
-def test_gates_notifications_and_manual_mail(telepy, entries):
-    @telepy.gate("edit-post")
+def test_gates_notifications_and_manual_mail(tracefox, entries):
+    @tracefox.gate("edit-post")
     def can_edit(user_id):
         return user_id == 1
 
     assert can_edit(1) is True
     assert can_edit(2) is False
-    telepy.record_notification("InvoicePaid", "User:1", "mail", {"id": "abc"})
-    telepy.record_mail(mailable="Welcome", to=["a@b.c"], subject="Hi", html="<b>hi</b>")
+    tracefox.record_notification("InvoicePaid", "User:1", "mail", {"id": "abc"})
+    tracefox.record_mail(mailable="Welcome", to=["a@b.c"], subject="Hi", html="<b>hi</b>")
     assert [g["content"]["result"] for g in entries(EntryType.GATE)] == ["denied", "allowed"]
     assert entries(EntryType.NOTIFICATION)[0]["content"]["notifiable"] == "User:1"
     mail = entries(EntryType.MAIL)[0]
     assert mail["content"]["to"] == ["a@b.c"]
-    assert sorted(telepy.storage.find(mail["id"])["tags"]) == ["Welcome", "a@b.c"]
+    assert sorted(tracefox.storage.find(mail["id"])["tags"]) == ["Welcome", "a@b.c"]
 
 
-def test_job_decorator_records_processed_and_failed_jobs(telepy, entries):
-    @telepy.job(queue="emails")
+def test_job_decorator_records_processed_and_failed_jobs(tracefox, entries):
+    @tracefox.job(queue="emails")
     def send(to):
         if to == "bad":
             raise ValueError("bounced")
         return to
 
-    with telepy.batch():
+    with tracefox.batch():
         send("ok")
         with pytest.raises(ValueError):
             send("bad")
@@ -209,7 +209,7 @@ def test_job_decorator_records_processed_and_failed_jobs(telepy, entries):
     assert "bounced" in jobs["bad"]["exception"]["message"]
 
 
-def test_click_commands(telepy, entries):
+def test_click_commands(tracefox, entries):
     import click
     from click.testing import CliRunner
 
@@ -232,7 +232,7 @@ def test_click_commands(telepy, entries):
     assert log["batch_id"] == commands[1]["batch_id"]
 
 
-def test_apscheduler_jobs(telepy, entries):
+def test_apscheduler_jobs(tracefox, entries):
     pytest.importorskip("apscheduler")
     from apscheduler.schedulers.background import BackgroundScheduler
 
@@ -260,11 +260,11 @@ def test_apscheduler_jobs(telepy, entries):
     assert task["output"] == "'sent'"
 
 
-def test_unregister_restores_patches(telepy):
+def test_unregister_restores_patches(tracefox):
     import httpx as module
 
     patched = module.Client.send
-    telepy.stop()
+    tracefox.stop()
     assert module.Client.send is not patched
-    assert not getattr(module.Client.send, "__telepy_patched__", False)
-    telepy.start()
+    assert not getattr(module.Client.send, "__tracefox_patched__", False)
+    tracefox.start()

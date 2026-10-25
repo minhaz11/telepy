@@ -1,35 +1,61 @@
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling>=1.27"]
 build-backend = "hatchling.build"
 
 [project]
-name = "telepy"
+name = "tracefox"
 version = "0.1.0"
-description = "An elegant debug assistant for Python web apps (FastAPI, Flask, Django, any ASGI/WSGI) inspired by Laravel Telescope."
+description = "An elegant debug assistant for Python web apps (FastAPI, Flask, Django, any ASGI/WSGI), inspired by Laravel Telescope."
 readme = "README.md"
 requires-python = ">=3.9"
-license = { text = "MIT" }
-dependencies = ["sqlalchemy>=1.4"]
-keywords = ["debug", "telepy", "fastapi", "flask", "django", "profiler", "monitoring"]
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Minhaz" }]
+dependencies = ["sqlalchemy>=2.0"]
+keywords = ["debug", "debugger", "telescope", "fastapi", "flask", "django", "profiler", "monitoring", "observability"]
 classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Web Environment",
     "Framework :: Django",
     "Framework :: FastAPI",
     "Framework :: Flask",
+    "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Internet :: WWW/HTTP",
     "Topic :: Software Development :: Debuggers",
+    "Topic :: System :: Monitoring",
 ]
+
+[project.urls]
+Homepage = "https://github.com/minhaz11/telepy"
+Repository = "https://github.com/minhaz11/telepy"
+Issues = "https://github.com/minhaz11/telepy/issues"
 
 [project.optional-dependencies]
 fastapi = ["fastapi"]
 flask = ["flask"]
 django = ["django>=3.2"]
-dev = ["pytest", "fastapi", "uvicorn", "httpx", "flask", "django", "requests", "jinja2", "redis", "fakeredis", "celery", "apscheduler", "click", "python-multipart"]
+dev = [
+    "pytest", "fastapi", "uvicorn", "httpx", "flask", "django", "requests", "jinja2", "redis", "fakeredis",
+    "celery", "apscheduler", "click", "python-multipart",
+]
 
 [project.scripts]
-telepy = "telepy.cli:main"
+tracefox = "tracefox.cli:main"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/telepy"]
+packages = ["src/tracefox"]
+
+[tool.hatch.build.targets.sdist]
+include = ["src/tracefox", "tests", "examples", "README.md", "LICENSE", "pyproject.toml"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

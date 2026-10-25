@@ -12,10 +12,10 @@ if not settings.configured:
         ROOT_URLCONF=__name__,
         INSTALLED_APPS=[
             "django.contrib.contenttypes", "django.contrib.auth", "django.contrib.sessions",
-            "telepy.integrations.django",
+            "tracefox.integrations.django",
         ],
         MIDDLEWARE=[
-            "telepy.integrations.django.middleware.TelepyMiddleware",
+            "tracefox.integrations.django.middleware.TracefoxMiddleware",
             "django.contrib.sessions.middleware.SessionMiddleware",
             "django.contrib.auth.middleware.AuthenticationMiddleware",
         ],
@@ -26,7 +26,7 @@ if not settings.configured:
             "BACKEND": "django.template.backends.django.DjangoTemplates",
             "OPTIONS": {"loaders": [("django.template.loaders.locmem.Loader", {"hello.html": "Hi {{ name }}"})]},
         }],
-        TELEPY={"database_url": "sqlite://", "async_writes": False},
+        TRACEFOX={"database_url": "sqlite://", "async_writes": False},
         USE_TZ=True,
     )
     django.setup()
@@ -41,7 +41,7 @@ from django.shortcuts import render  # noqa: E402
 from django.test import Client  # noqa: E402
 from django.urls import include, path  # noqa: E402
 
-from telepy import EntryType  # noqa: E402
+from tracefox import EntryType  # noqa: E402
 
 order_placed = Signal()
 
@@ -73,12 +73,12 @@ urlpatterns = [
     path("hello/<str:name>/", hello),
     path("users/", create_user),
     path("boom/", boom),
-    path("telepy/", include("telepy.integrations.django.urls")),
+    path("tracefox/", include("tracefox.integrations.django.urls")),
 ]
 
 
 @pytest.fixture
-def client(telepy):
+def client(tracefox):
     call_command("migrate", run_syncdb=True, verbosity=0)
     return Client(raise_request_exception=False)
 
@@ -126,13 +126,13 @@ def test_exceptions_are_recorded(client, entries):
 
 def test_dashboard_is_served_and_not_recorded(client, entries):
     client.get("/hello/x/")
-    assert client.get("/telepy/").status_code == 200
-    assert client.get("/telepy/queries").status_code == 200
-    api = client.get("/telepy/api/entries/request").json()
+    assert client.get("/tracefox/").status_code == 200
+    assert client.get("/tracefox/queries").status_code == 200
+    api = client.get("/tracefox/api/entries/request").json()
     assert len(api["entries"]) == 1
-    toggled = client.post("/telepy/api/toggle-recording", HTTP_X_TELEPY_REQUEST="1")
+    toggled = client.post("/tracefox/api/toggle-recording", HTTP_X_TRACEFOX_REQUEST="1")
     assert toggled.json() == {"recording": False}
-    client.post("/telepy/api/toggle-recording", HTTP_X_TELEPY_REQUEST="1")
+    client.post("/tracefox/api/toggle-recording", HTTP_X_TRACEFOX_REQUEST="1")
     assert len(entries(EntryType.REQUEST)) == 1
 
 
@@ -141,5 +141,5 @@ def test_management_commands(client, entries):
     command = entries(EntryType.COMMAND)[0]["content"]
     assert command["command"] == "diffsettings"
     assert command["exit_code"] == 0
-    call_command("telepy_clear", stdout=__import__("io").StringIO())
+    call_command("tracefox_clear", stdout=__import__("io").StringIO())
     assert entries(EntryType.COMMAND) == []

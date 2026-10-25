@@ -2,7 +2,7 @@ import time
 
 import pytest
 
-from telepy import EntryType
+from tracefox import EntryType
 
 celery = pytest.importorskip("celery")
 from celery import Celery, group  # noqa: E402
@@ -33,13 +33,13 @@ def wait_for(fetch, predicate, timeout=10):
 
 
 @pytest.fixture
-def worker(telepy):
+def worker(tracefox):
     with start_worker(app, perform_ping_check=False, pool="solo", loglevel="WARNING"):
         yield
 
 
-def test_dispatched_tasks_are_updated_by_the_worker(worker, entries, telepy):
-    with telepy.batch() as request_batch:
+def test_dispatched_tasks_are_updated_by_the_worker(worker, entries, tracefox):
+    with tracefox.batch() as request_batch:
         add.delay(2, 3)
         fail.delay()
     jobs = wait_for(lambda: entries(EntryType.JOB), lambda rows: {r["content"]["status"] for r in rows} == {"processed", "failed"})

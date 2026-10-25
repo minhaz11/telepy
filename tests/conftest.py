@@ -1,30 +1,30 @@
 import pytest
 
-from telepy import TelepyConfig, telepy as _telepy
-from telepy.storage import EntryQueryOptions
+from tracefox import TracefoxConfig, tracefox as _tracefox
+from tracefox.storage import EntryQueryOptions
 
 
 @pytest.fixture
-def telepy(tmp_path):
-    _telepy.stop()
-    _telepy.config = TelepyConfig(
-        database_url=f"sqlite:///{tmp_path / 'telepy.sqlite3'}", environment="local", async_writes=False,
+def tracefox(tmp_path):
+    _tracefox.stop()
+    _tracefox.config = TracefoxConfig(
+        database_url=f"sqlite:///{tmp_path / 'tracefox.sqlite3'}", environment="local", async_writes=False,
     )
-    _telepy._storage = None
-    _telepy._recording_cache = (0.0, True)
-    _telepy.forget_monitored_cache()
-    _telepy._tag_callbacks.clear()
-    _telepy._filters.clear()
-    _telepy._batch_filters.clear()
-    _telepy.start()
-    yield _telepy
-    _telepy.stop()
+    _tracefox._storage = None
+    _tracefox._recording_cache = (0.0, True)
+    _tracefox.forget_monitored_cache()
+    _tracefox._tag_callbacks.clear()
+    _tracefox._filters.clear()
+    _tracefox._batch_filters.clear()
+    _tracefox.start()
+    yield _tracefox
+    _tracefox.stop()
 
 
 @pytest.fixture
-def entries(telepy):
+def entries(tracefox):
     def fetch(type=None, **options):
-        telepy.flush()
-        return telepy.storage.get(type, EntryQueryOptions(limit=500, **options))
+        tracefox.flush()
+        return tracefox.storage.get(type, EntryQueryOptions(limit=500, **options))
 
     return fetch

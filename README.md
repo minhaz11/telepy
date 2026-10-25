@@ -1,4 +1,6 @@
-# telepy
+# tracefox
+
+[![PyPI](https://img.shields.io/pypi/v/tracefox)](https://pypi.org/project/tracefox/) [![CI](https://github.com/minhaz11/telepy/actions/workflows/ci.yml/badge.svg)](https://github.com/minhaz11/telepy/actions/workflows/ci.yml) [![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
 An elegant debug assistant for Python web apps, modelled on Laravel Telescope. It records the requests coming into your app, plus the exceptions, logs, database queries, ORM model changes, queued jobs, mail, notifications, cache operations, Redis commands, scheduled tasks, outgoing HTTP calls, template renders and variable dumps behind them. All of it appears in a Telescope-style dashboard.
 
@@ -15,23 +17,23 @@ It works with **FastAPI / Starlette**, **Flask** and **Django**, plus any other 
 
 Everything that Laravel Telescope does, mapped to the Python ecosystem:
 
-| Telescope screen | What telepy records | Hooks |
+| Telescope screen | What tracefox records | Hooks |
 |---|---|---|
 | **Requests** | method, path, controller action, middleware, headers, payload, session, response, status, duration, memory, authenticated user | ASGI middleware, WSGI middleware, Django middleware |
-| **Commands** | command, arguments, options, exit code (plus every entry recorded while it ran) | Click / Typer / Flask CLI, Django management commands, `telepy.command()` |
+| **Commands** | command, arguments, options, exit code (plus every entry recorded while it ran) | Click / Typer / Flask CLI, Django management commands, `tracefox.command()` |
 | **Schedule** | command, expression, description, timezone, output | APScheduler 3.x, Celery beat |
-| **Jobs** | name, queue, connection, tries, timeout, data, status `pending → processed / failed`, exception | Celery (dispatch + worker), FastAPI/Starlette `BackgroundTasks`, `@telepy.job` |
+| **Jobs** | name, queue, connection, tries, timeout, data, status `pending → processed / failed`, exception | Celery (dispatch + worker), FastAPI/Starlette `BackgroundTasks`, `@tracefox.job` |
 | **Batches** | total / pending / processed / failed jobs, progress | Celery `group` / `chord` |
-| **Cache** | hit / missed / set / forget, key, value, expiration | Django cache framework, Flask-Caching, `telepy.record_cache()` |
-| **Dumps** | dumped values with file:line | `telepy.dump(value)` |
-| **Events** | name, payload, listeners | Django signals, blinker (Flask) signals, `telepy.record_event()` |
+| **Cache** | hit / missed / set / forget, key, value, expiration | Django cache framework, Flask-Caching, `tracefox.record_cache()` |
+| **Dumps** | dumped values with file:line | `tracefox.dump(value)` |
+| **Events** | name, payload, listeners | Django signals, blinker (Flask) signals, `tracefox.record_event()` |
 | **Exceptions** | class, message, location with code preview, stack trace, context, occurrences grouped by family | unhandled request errors, `logger.exception()`, `sys.excepthook`, thread excepthook |
-| **Gates** | ability, allowed / denied, arguments, location | Django `has_perm`, `@telepy.gate()`, `telepy.record_gate()` |
+| **Gates** | ability, allowed / denied, arguments, location | Django `has_perm`, `@tracefox.gate()`, `tracefox.record_gate()` |
 | **HTTP Client** | method, URI, headers, payload, status, response, duration | httpx (sync + async), requests, aiohttp |
 | **Logs** | level, message, channel (logger), context (`extra=`), location | stdlib `logging` |
-| **Mail** | mailable, from, to, cc, bcc, reply-to, subject, HTML preview, `.eml` download | Django mail backends, smtplib (Flask-Mail), aiosmtplib (fastapi-mail), `telepy.record_mail()` |
+| **Mail** | mailable, from, to, cc, bcc, reply-to, subject, HTML preview, `.eml` download | Django mail backends, smtplib (Flask-Mail), aiosmtplib (fastapi-mail), `tracefox.record_mail()` |
 | **Models** | created / updated (with changed attributes) / deleted, plus hydration counts per request | SQLAlchemy ORM, Django ORM |
-| **Notifications** | notification, notifiable, channel, response | `telepy.record_notification()` |
+| **Notifications** | notification, notifiable, channel, response | `tracefox.record_notification()` |
 | **Queries** | SQL with bindings interpolated, bindings, duration, `slow` tag, file:line of your code | SQLAlchemy (every engine), Django ORM |
 | **Redis** | command, connection, duration (pipelines too) | redis-py (sync + asyncio) |
 | **Views** | template name, path, data keys | Jinja2 (Flask, Starlette templates), Django templates |
@@ -39,10 +41,10 @@ Everything that Laravel Telescope does, mapped to the Python ecosystem:
 Plus the rest of Telescope's machinery:
 
 - **Batches of related entries.** Everything recorded during one request, job or command shares a `batch_id`. The detail page shows it all in tabs: a request's queries, logs, exceptions, jobs, mail and so on.
-- **Tags.** Tags are added automatically: `Auth:<id>`, model keys like `app.models.User:1`, `slow`, `failed` and mail recipients. You can add your own with `telepy.tag(...)` and search by tag on every screen.
+- **Tags.** Tags are added automatically: `Auth:<id>`, model keys like `app.models.User:1`, `slow`, `failed` and mail recipients. You can add your own with `tracefox.tag(...)` and search by tag on every screen.
 - **Monitoring.** Entries with a monitored tag are always recorded, even when filters would drop them.
 - **Exception families.** Repeats of the same exception collapse into one row with an occurrence count and an "other occurrences" view.
-- **Filtering.** Outside `local`, a default filter keeps only failed requests, exceptions, failed jobs, scheduled tasks, slow queries and monitored tags. You can add `telepy.filter(...)` / `telepy.filter_batch(...)`.
+- **Filtering.** Outside `local`, a default filter keeps only failed requests, exceptions, failed jobs, scheduled tasks, slow queries and monitored tags. You can add `tracefox.filter(...)` / `tracefox.filter_batch(...)`.
 - **Privacy.** Sensitive request headers and parameters are masked as `********`. `password`, `authorization` and `cookie` are masked by default, and the lists are configurable.
 - **Pause / resume recording, clear all entries, light / dark / system theme, live "Load New Entries", pruning.**
 - **Safe by default.** The dashboard returns 403 outside `local` unless you pass an `authorization` callback. Every write needs a custom header, which blocks CSRF. Watchers never raise into your app.
@@ -51,11 +53,11 @@ Plus the rest of Telescope's machinery:
 ## Install
 
 ```bash
-pip install telepy            # core (SQLAlchemy is the only dependency)
-pip install "telepy[fastapi]" # or [flask] / [django]
+pip install tracefox            # core (SQLAlchemy is the only dependency)
+pip install "tracefox[fastapi]" # or [flask] / [django]
 ```
 
-Entries are stored with SQLAlchemy, so any database it supports works. The default is a local SQLite file (`telepy.sqlite3`). Tables are created automatically.
+Entries are stored with SQLAlchemy, so any database it supports works. The default is a local SQLite file (`tracefox.sqlite3`). Tables are created automatically.
 
 ## Quick start
 
@@ -63,63 +65,63 @@ Entries are stored with SQLAlchemy, so any database it supports works. The defau
 
 ```python
 from fastapi import FastAPI
-from telepy.integrations.fastapi import init_telepy
+from tracefox.integrations.fastapi import init_tracefox
 
 app = FastAPI(debug=True)
-init_telepy(app)            # middleware + dashboard at /telepy
+init_tracefox(app)            # middleware + dashboard at /tracefox
 ```
 
 ### Flask
 
 ```python
 from flask import Flask
-from telepy.integrations.flask import FlaskTelepy
+from tracefox.integrations.flask import FlaskTracefox
 
 app = Flask(__name__)
-app.config["TELEPY"] = {"database_url": "sqlite:///telepy.sqlite3"}
-FlaskTelepy(app)            # middleware + dashboard + `flask telepy prune|clear|pause|resume`
+app.config["TRACEFOX"] = {"database_url": "sqlite:///tracefox.sqlite3"}
+FlaskTracefox(app)            # middleware + dashboard + `flask tracefox prune|clear|pause|resume`
 ```
 
 ### Django
 
 ```python
 # settings.py
-INSTALLED_APPS += ["telepy.integrations.django"]
-MIDDLEWARE.insert(0, "telepy.integrations.django.middleware.TelepyMiddleware")
-TELEPY = {
+INSTALLED_APPS += ["tracefox.integrations.django"]
+MIDDLEWARE.insert(0, "tracefox.integrations.django.middleware.TracefoxMiddleware")
+TRACEFOX = {
     "authorization": lambda request: request.user.is_staff,   # who may open the dashboard outside DEBUG
 }
 
 # urls.py
-urlpatterns += [path("telepy/", include("telepy.integrations.django.urls"))]
+urlpatterns += [path("tracefox/", include("tracefox.integrations.django.urls"))]
 ```
 
-Management commands: `telepy_prune [--hours 48] [--keep-exceptions]`, `telepy_clear`, `telepy_pause`, `telepy_resume`.
+Management commands: `tracefox_prune [--hours 48] [--keep-exceptions]`, `tracefox_clear`, `tracefox_pause`, `tracefox_resume`.
 
 ### Any other ASGI / WSGI framework
 
 ```python
-from telepy import telepy
-from telepy.integrations import TelepyMiddleware, TelepyWSGIMiddleware
-from telepy.dashboard import TelepyASGI, TelepyWSGI
+from tracefox import tracefox
+from tracefox.integrations import TracefoxMiddleware, TracefoxWSGIMiddleware
+from tracefox.dashboard import TracefoxASGI, TracefoxWSGI
 
-telepy.start(environment="local")
-asgi_app = TelepyMiddleware(asgi_app)                 # record requests
-# mount TelepyASGI() (or TelepyWSGI()) at /telepy with your router
+tracefox.start(environment="local")
+asgi_app = TracefoxMiddleware(asgi_app)                 # record requests
+# mount TracefoxASGI() (or TracefoxWSGI()) at /tracefox with your router
 ```
 
-Open **http://localhost:8000/telepy**.
+Open **http://localhost:8000/tracefox**.
 
 ## Configuration
 
-Options are passed as keyword arguments to `init_telepy(app, ...)` / `FlaskTelepy(app, ...)` / `telepy.start(...)`, through Flask's `app.config["TELEPY"]`, or through Django's `TELEPY = {...}`.
+Options are passed as keyword arguments to `init_tracefox(app, ...)` / `FlaskTracefox(app, ...)` / `tracefox.start(...)`, through Flask's `app.config["TRACEFOX"]`, or through Django's `TRACEFOX = {...}`.
 
 | Option | Default | |
 |---|---|---|
-| `enabled` | `$TELEPY_ENABLED` or `True` | master switch |
-| `environment` | `$TELEPY_ENV` / `$APP_ENV`; otherwise `local` when the framework is in debug mode, else `production` | `local` records everything and opens the dashboard |
-| `path` | `/telepy` | dashboard URL |
-| `database_url` | `$TELEPY_DATABASE_URL` or `sqlite:///telepy.sqlite3` | any SQLAlchemy URL |
+| `enabled` | `$TRACEFOX_ENABLED` or `True` | master switch |
+| `environment` | `$TRACEFOX_ENV` / `$APP_ENV`; otherwise `local` when the framework is in debug mode, else `production` | `local` records everything and opens the dashboard |
+| `path` | `/tracefox` | dashboard URL |
+| `database_url` | `$TRACEFOX_DATABASE_URL` or `sqlite:///tracefox.sqlite3` | any SQLAlchemy URL |
 | `authorization` | `None` | `callable(request) -> bool`; receives the framework's request object |
 | `watchers` | all enabled | e.g. `{"queries": {"slow": 50}, "redis": False, "logs": {"level": "WARNING"}}` |
 | `ignore_paths` / `only_paths` | static assets ignored | glob patterns for request recording |
@@ -147,21 +149,21 @@ Watcher options:
 ## Customising
 
 ```python
-from telepy import telepy, dump
+from tracefox import tracefox, dump
 
 # Tag entries
-@telepy.tag
+@tracefox.tag
 def tags(entry):
     return ["vip"] if entry.is_request() and entry.content.get("user", {}).get("id") == 1 else []
 
 # Only keep what matters (monitored tags always pass)
-telepy.filter(lambda entry: entry.is_exception() or entry.is_failed_request() or entry.is_slow_query())
+tracefox.filter(lambda entry: entry.is_exception() or entry.is_failed_request() or entry.is_slow_query())
 
 # Keep or drop a whole request/job/command batch
-telepy.filter_batch(lambda entries: any(e.is_exception() for e in entries))
+tracefox.filter_batch(lambda entries: any(e.is_exception() for e in entries))
 
-telepy.hide_request_parameters("ssn", "card_number")
-telepy.hide_request_headers("x-internal-token")
+tracefox.hide_request_parameters("ssn", "card_number")
+tracefox.hide_request_headers("x-internal-token")
 ```
 
 ### Manual instrumentation
@@ -170,44 +172,44 @@ Some Laravel concepts have no single standard in Python, so each one also has a 
 
 ```python
 dump(user, order)                                         # Dumps screen; returns its argument
-telepy.record_event("order.shipped", {"id": 7}, listeners=["NotifyCustomer"])
-telepy.record_notification("InvoicePaid", user, "slack", response={"ok": True})
-telepy.record_mail(mailable="WelcomeMail", to=["a@b.c"], subject="Hi", html="<h1>Hi</h1>")
-telepy.record_cache("hit", "user:1", value)
-telepy.record_gate("edit-post", allowed, [post])
+tracefox.record_event("order.shipped", {"id": 7}, listeners=["NotifyCustomer"])
+tracefox.record_notification("InvoicePaid", user, "slack", response={"ok": True})
+tracefox.record_mail(mailable="WelcomeMail", to=["a@b.c"], subject="Hi", html="<h1>Hi</h1>")
+tracefox.record_cache("hit", "user:1", value)
+tracefox.record_gate("edit-post", allowed, [post])
 
-@telepy.gate("publish-post")           # records the boolean result
+@tracefox.gate("publish-post")           # records the boolean result
 def can_publish(user, post): ...
 
-@telepy.job(queue="emails")            # records a processed / failed job and batches its entries
+@tracefox.job(queue="emails")            # records a processed / failed job and batches its entries
 def send_digest(user_id): ...
 
-with telepy.command("import:users", {"file": path}):   # records a custom command
+with tracefox.command("import:users", {"file": path}):   # records a custom command
     ...
 
-with telepy.batch():                   # group entries recorded outside a request
+with tracefox.batch():                   # group entries recorded outside a request
     ...
 
-with telepy.without_recording():       # skip recording for a block
+with tracefox.without_recording():       # skip recording for a block
     ...
 ```
 
 ## Maintenance
 
 ```bash
-telepy prune --hours 48 --keep-exceptions
-telepy clear
-telepy pause | resume
-telepy --database-url postgresql://... migrate
+tracefox prune --hours 48 --keep-exceptions
+tracefox clear
+tracefox pause | resume
+tracefox --database-url postgresql://... migrate
 ```
 
 Run `prune` on a schedule, as Laravel's docs recommend, or set `auto_prune_hours`.
 
 ## How it works
 
-- **Watchers** hook libraries only when your app imports them. A `sys.meta_path` hook runs the callback after import, so telepy never pulls in Celery or Django by itself. Every patch is reversible with `telepy.stop()`.
+- **Watchers** hook libraries only when your app imports them. A `sys.meta_path` hook runs the callback after import, so tracefox never pulls in Celery or Django by itself. Every patch is reversible with `tracefox.stop()`.
 - **Batches** live in a `ContextVar`, so they follow `async` code, threadpools, `asgiref` and Celery tasks correctly. Entries are buffered and written when the request, job or command finishes.
-- **Storage** mirrors Laravel Telescope's schema: `telepy_entries`, `telepy_entries_tags`, `telepy_monitoring`, plus `telepy_settings`. Repeated exceptions are folded into families when they are written.
+- **Storage** mirrors Laravel Telescope's schema: `tracefox_entries`, `tracefox_entries_tags`, `tracefox_monitoring`, plus `tracefox_settings`. Repeated exceptions are folded into families when they are written.
 - **Out-of-order updates.** A job can finish (in a worker, or a background task) before the request that dispatched it is written. That update is applied in memory if the entry is still buffered; otherwise the writer retries it for two minutes.
 - **The dashboard** is a dependency-free single-page app served by a framework-agnostic handler, with thin ASGI, WSGI and Django adapters.
 
@@ -216,5 +218,17 @@ Run `prune` on a schedule, as Laravel's docs recommend, or set `auto_prune_hours
 ```bash
 uv venv && uv pip install -e ".[dev]"
 pytest
-TELEPY_ENV=local uvicorn examples.fastapi_app:app --reload   # demo that exercises every watcher
+TRACEFOX_ENV=local uvicorn examples.fastapi_app:app --reload   # demo that exercises every watcher
 ```
+
+## Releasing
+
+Releases go to PyPI from GitHub Actions through [Trusted Publishing](https://docs.pypi.org/trusted-publishers/), so no API token is stored.
+
+1. Bump `version` in `pyproject.toml` and commit.
+2. Tag it and push the tag: `git tag v0.1.1 && git push origin v0.1.1`.
+3. The **Publish to PyPI** workflow tests, builds, checks and uploads the release.
+
+## License
+
+MIT — see [LICENSE](LICENSE).

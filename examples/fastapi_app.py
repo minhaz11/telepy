@@ -1,7 +1,7 @@
-"""Demo FastAPI app that exercises every Telepy watcher.
+"""Demo FastAPI app that exercises every Tracefox watcher.
 
-    TELEPY_ENV=local uvicorn examples.fastapi_app:app --reload
-    open http://127.0.0.1:8000/telepy
+    TRACEFOX_ENV=local uvicorn examples.fastapi_app:app --reload
+    open http://127.0.0.1:8000/tracefox
 """
 
 import logging
@@ -14,13 +14,13 @@ from pydantic import BaseModel
 from sqlalchemy import ForeignKey, String, create_engine, select
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column
 
-from telepy import dump, telepy
-from telepy.integrations.fastapi import init_telepy
+from tracefox import dump, tracefox
+from tracefox.integrations.fastapi import init_tracefox
 
 logger = logging.getLogger("demo")
 
-app = FastAPI(debug=True, title="Telepy demo")
-init_telepy(app, database_url="sqlite:///telepy-demo.sqlite3")
+app = FastAPI(debug=True, title="Tracefox demo")
+init_tracefox(app, database_url="sqlite:///tracefox-demo.sqlite3")
 
 engine = create_engine("sqlite:///demo-app.sqlite3")
 
@@ -72,7 +72,7 @@ def fake_api(request: httpx.Request) -> httpx.Response:
 http = httpx.Client(transport=httpx.MockTransport(fake_api), base_url="https://api.example.com")
 
 
-@telepy.gate("view-dashboard")
+@tracefox.gate("view-dashboard")
 def can_view_dashboard(user: User) -> bool:
     return user.id % 2 == 1
 
@@ -82,7 +82,7 @@ def home():
     with Session(engine) as session:
         users = session.scalars(select(User).limit(5)).all()
     logger.info("Rendering home page for %d users", len(users))
-    return templates.get_template("home.html").render(name="Telepy", users=users)
+    return templates.get_template("home.html").render(name="Tracefox", users=users)
 
 
 @app.get("/users")
@@ -107,7 +107,7 @@ def create_user(payload: UserIn, background: BackgroundTasks):
         user.name = user.name.title()
         session.commit()
         user_id = user.id
-    telepy.record_event("user.registered", {"id": user_id, "email": payload.email}, ["SendWelcomeEmail", "SyncCrm"])
+    tracefox.record_event("user.registered", {"id": user_id, "email": payload.email}, ["SendWelcomeEmail", "SyncCrm"])
     background.add_task(send_welcome_email, user_id, payload.email)
     logger.warning("New signup from %s", payload.email, extra={"user_id": user_id})
     return {"id": user_id}
@@ -116,12 +116,12 @@ def create_user(payload: UserIn, background: BackgroundTasks):
 def send_welcome_email(user_id: int, email: str) -> None:
     with Session(engine) as session:
         session.get(User, user_id)
-    telepy.record_mail(
+    tracefox.record_mail(
         mailable="WelcomeMail", to=[email], subject="Welcome aboard!", **{"from": ["hello@example.com"]},
         html=f"<h2>Welcome!</h2><p>Thanks for joining, {email}.</p>",
         raw=f"From: hello@example.com\r\nTo: {email}\r\nSubject: Welcome aboard!\r\n\r\nThanks for joining.",
     )
-    telepy.record_notification("InvoicePaid", f"User:{user_id}", "slack", {"ok": True})
+    tracefox.record_notification("InvoicePaid", f"User:{user_id}", "slack", {"ok": True})
 
 
 @app.get("/weather")
