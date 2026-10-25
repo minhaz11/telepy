@@ -1,0 +1,35 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "telepy"
+version = "0.1.0"
+description = "An elegant debug assistant for Python web apps (FastAPI, Flask, Django, any ASGI/WSGI) inspired by Laravel Telescope."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+dependencies = ["sqlalchemy>=1.4"]
+keywords = ["debug", "telepy", "fastapi", "flask", "django", "profiler", "monitoring"]
+classifiers = [
+    "Framework :: Django",
+    "Framework :: FastAPI",
+    "Framework :: Flask",
+    "Programming Language :: Python :: 3",
+    "Topic :: Software Development :: Debuggers",
+]
+
+[project.optional-dependencies]
+fastapi = ["fastapi"]
+flask = ["flask"]
+django = ["django>=3.2"]
+dev = ["pytest", "fastapi", "uvicorn", "httpx", "flask", "django", "requests", "jinja2", "redis", "fakeredis", "celery", "apscheduler", "click", "python-multipart"]
+
+[project.scripts]
+telepy = "telepy.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/telepy"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
