@@ -1,4 +1,5 @@
 import base64
+import secrets
 
 import pytest
 from fastapi import FastAPI
@@ -8,6 +9,10 @@ from tracefox import EntryType, IncomingEntry, TracefoxConfig
 from tracefox.integrations.fastapi import init_tracefox
 
 PROTECTED = ["development", "dev", "stage", "staging", "uat", "production"]
+
+# Throwaway credentials generated per run, so no password is ever written into the repo.
+PASSWORD = secrets.token_urlsafe(16)
+OTHER_PASSWORD = secrets.token_urlsafe(16)
 
 
 @pytest.fixture
@@ -39,30 +44,31 @@ def test_other_environments_are_locked_without_credentials(client, tracefox, env
 @pytest.mark.parametrize("env", PROTECTED)
 def test_basic_auth_prompts_and_accepts_the_right_password(client, tracefox, env):
     tracefox.config.environment = env
-    tracefox.config.basic_auth = ("admin", "s3cret")
+    tracefox.config.basic_auth = ("admin", PASSWORD)
     challenge = client.get("/tracefox")
     assert challenge.status_code == 401
     assert challenge.headers["www-authenticate"].startswith('Basic realm="TraceFox"')
-    assert client.get("/tracefox", headers=basic("admin", "wrong")).status_code == 401
-    assert client.get("/tracefox", headers=basic("root", "s3cret")).status_code == 401
-    assert client.get("/tracefox", headers=basic("admin", "s3cret")).status_code == 200
-    assert client.get("/tracefox/api/entries/request", headers=basic("admin", "s3cret")).status_code == 200
+    assert client.get("/tracefox", headers=basic("admin", OTHER_PASSWORD)).status_code == 401
+    assert client.get("/tracefox", headers=basic("root", PASSWORD)).status_code == 401
+    assert client.get("/tracefox", headers=basic("admin", PASSWORD)).status_code == 200
+    assert client.get("/tracefox/api/entries/request", headers=basic("admin", PASSWORD)).status_code == 200
     assert client.get("/tracefox/api/entries/request").status_code == 401
 
 
 def test_basic_auth_supports_several_users_and_a_string(client, tracefox):
     tracefox.config.environment = "staging"
-    tracefox.config.basic_auth = {"ada": "one", "grace": "two"}
-    assert client.get("/tracefox", headers=basic("grace", "two")).status_code == 200
-    assert client.get("/tracefox", headers=basic("ada", "two")).status_code == 401
-    tracefox.config.basic_auth = "ops:pa:ss"
-    assert client.get("/tracefox", headers=basic("ops", "pa:ss")).status_code == 200
+    tracefox.config.basic_auth = {"ada": PASSWORD, "grace": OTHER_PASSWORD}
+    assert client.get("/tracefox", headers=basic("grace", OTHER_PASSWORD)).status_code == 200
+    assert client.get("/tracefox", headers=basic("ada", OTHER_PASSWORD)).status_code == 401
+    with_colon = f"{PASSWORD}:{OTHER_PASSWORD}"
+    tracefox.config.basic_auth = f"ops:{with_colon}"
+    assert client.get("/tracefox", headers=basic("ops", with_colon)).status_code == 200
 
 
 def test_credentials_come_from_environment_variables(monkeypatch):
     monkeypatch.setenv("TRACEFOX_USERNAME", "admin")
-    monkeypatch.setenv("TRACEFOX_PASSWORD", "from-env")
-    assert TracefoxConfig().basic_auth_users() == {"admin": "from-env"}
+    monkeypatch.setenv("TRACEFOX_PASSWORD", PASSWORD)
+    assert TracefoxConfig().basic_auth_users() == {"admin": PASSWORD}
     monkeypatch.delenv("TRACEFOX_PASSWORD")
     assert TracefoxConfig().basic_auth_users() == {}
 
@@ -76,11 +82,11 @@ def test_authorization_callback_decides_when_set(client, tracefox):
 
 def test_basic_auth_and_callback_must_both_pass(client, tracefox):
     tracefox.config.environment = "production"
-    tracefox.config.basic_auth = ("admin", "s3cret")
+    tracefox.config.basic_auth = ("admin", PASSWORD)
     tracefox.config.authorization = lambda request: request.headers.get("x-team") == "ops"
     assert client.get("/tracefox", headers={"x-team": "ops"}).status_code == 401
-    assert client.get("/tracefox", headers=basic("admin", "s3cret")).status_code == 403
-    assert client.get("/tracefox", headers={**basic("admin", "s3cret"), "x-team": "ops"}).status_code == 200
+    assert client.get("/tracefox", headers=basic("admin", PASSWORD)).status_code == 403
+    assert client.get("/tracefox", headers={**basic("admin", PASSWORD), "x-team": "ops"}).status_code == 200
 
 
 def test_open_environments_are_configurable(client, tracefox):
@@ -94,7 +100,7 @@ def test_open_environments_are_configurable(client, tracefox):
 
 def test_static_assets_load_before_login(client, tracefox):
     tracefox.config.environment = "staging"
-    tracefox.config.basic_auth = ("admin", "s3cret")
+    tracefox.config.basic_auth = ("admin", PASSWORD)
     assert client.get("/tracefox/static/app.css").status_code == 200
 
 
