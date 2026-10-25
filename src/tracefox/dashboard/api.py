@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import base64
+import hmac
 import html
 import json
 import logging
@@ -64,15 +66,25 @@ class Dashboard:
     def __init__(self, tracefox: "Tracefox"):
         self.tracefox = tracefox
 
-    def authorize(self, request: DashboardRequest) -> bool:
+    def access(self, request: DashboardRequest) -> Optional[str]:
+        """None when the viewer may see the dashboard, else "login" (ask for credentials) or "forbidden"."""
         config = self.tracefox.config
+        if config.dashboard_is_open:
+            return None
+        users = config.basic_auth_users()
+        if users and not _valid_basic_auth(request.headers.get("authorization", ""), users):
+            return "login"
         if config.authorization is not None:
             try:
-                return bool(config.authorization(request.native if request.native is not None else request))
+                allowed = bool(config.authorization(request.native if request.native is not None else request))
             except Exception:
                 logger.exception("Tracefox authorization callback failed")
-                return False
-        return config.is_local
+                allowed = False
+            return None if allowed else "forbidden"
+        return None if users else "forbidden"
+
+    def authorize(self, request: DashboardRequest) -> bool:
+        return self.access(request) is None
 
     def handle(self, request: DashboardRequest) -> DashboardResponse:
         with self.tracefox.without_recording():
@@ -86,10 +98,19 @@ class Dashboard:
         path = "/" + request.path.lstrip("/")
         if path.startswith("/static/"):
             return self._static(path[len("/static/"):])
-        if not self.authorize(request):
+        denied = self.access(request)
+        if denied == "login":
+            challenge = [("www-authenticate", 'Basic realm="TraceFox", charset="UTF-8"')]
+            if path.startswith("/api/"):
+                response = _json({"message": "Login required."}, 401)
+            else:
+                response = _html(LOGIN_PAGE, 401)
+            response.headers.extend(challenge)
+            return response
+        if denied == "forbidden":
             if path.startswith("/api/"):
                 return _json({"message": "Unauthorized."}, 403)
-            return _html(FORBIDDEN_PAGE, 403)
+            return _html(FORBIDDEN_PAGE.replace("{{ environment }}", html.escape(self.tracefox.config.env)), 403)
         if path.startswith("/api/"):
             if request.method not in ("GET", "HEAD") and request.headers.get(CSRF_HEADER) != "1":
                 return _json({"message": "Missing X-Tracefox-Request header."}, 419)
@@ -226,11 +247,37 @@ class Dashboard:
         return _json({"message": "Not found."}, 404)
 
 
-FORBIDDEN_PAGE = """<!doctype html><html><head><meta charset="utf-8"><title>TraceFox - Forbidden</title>
-<style>body{font-family:system-ui,sans-serif;background:#f3f4f6;color:#111827;display:flex;align-items:center;
-justify-content:center;height:100vh;margin:0}.card{background:#fff;padding:2rem 2.5rem;border-radius:12px;
-box-shadow:0 1px 3px rgba(0,0,0,.1);max-width:520px}code{background:#eef;padding:.1rem .35rem;border-radius:4px}</style>
+def _valid_basic_auth(header: str, users: Dict[str, str]) -> bool:
+    scheme, _, value = header.partition(" ")
+    if scheme.lower() != "basic" or not value:
+        return False
+    try:
+        username, _, password = base64.b64decode(value.strip()).decode("utf-8").partition(":")
+    except Exception:
+        return False
+    valid = False
+    for expected_user, expected_password in users.items():
+        # Compare every account in constant time so timing reveals nothing.
+        user_ok = hmac.compare_digest(username.encode(), expected_user.encode())
+        password_ok = hmac.compare_digest(password.encode(), expected_password.encode())
+        valid |= user_ok and password_ok
+    return valid
+
+
+_PAGE_STYLE = """<style>body{font-family:system-ui,sans-serif;background:#f3f4f6;color:#111827;display:flex;align-items:center;
+justify-content:center;min-height:100vh;margin:0}.card{background:#fff;padding:2rem 2.5rem;border-radius:12px;
+box-shadow:0 1px 3px rgba(0,0,0,.1);max-width:560px}code{background:#e8efff;padding:.1rem .35rem;border-radius:4px}
+li{margin:.35rem 0}</style>"""
+
+LOGIN_PAGE = """<!doctype html><html><head><meta charset="utf-8"><title>TraceFox - Login required</title>""" + _PAGE_STYLE + """
+</head><body><div class="card"><h2>401 &mdash; Login required</h2>
+<p>Sign in with the TraceFox username and password to open the dashboard.</p></div></body></html>"""
+
+FORBIDDEN_PAGE = """<!doctype html><html><head><meta charset="utf-8"><title>TraceFox - Forbidden</title>""" + _PAGE_STYLE + """
 </head><body><div class="card"><h2>403 &mdash; TraceFox is locked</h2>
-<p>The dashboard is only open in the <code>local</code> environment. Set <code>TRACEFOX_ENV=local</code>
-for development, or pass an <code>authorization</code> callback that returns <code>True</code> for allowed users.</p>
-</div></body></html>"""
+<p>The dashboard is open without login only in the <code>local</code> environment.
+This app is running in <code>{{ environment }}</code>. To let people in, either:</p>
+<ul>
+<li>set <code>TRACEFOX_USERNAME</code> and <code>TRACEFOX_PASSWORD</code> (or the <code>basic_auth</code> option) for a login prompt, or</li>
+<li>pass an <code>authorization</code> callback that returns <code>True</code> for allowed users.</li>
+</ul></div></body></html>"""

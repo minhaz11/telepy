@@ -13,6 +13,11 @@ def _env_bool(name: str, default: bool) -> bool:
     return value.strip().lower() in ("1", "true", "yes", "on")
 
 
+def _env_basic_auth() -> Any:
+    username, password = os.getenv("TRACEFOX_USERNAME"), os.getenv("TRACEFOX_PASSWORD")
+    return (username, password) if username and password else None
+
+
 def _env_environment() -> Optional[str]:
     for name in ("TRACEFOX_ENV", "APP_ENV", "ENVIRONMENT", "ENV"):
         if os.getenv(name):
@@ -60,9 +65,16 @@ class TracefoxConfig:
     )
     # The application's own SQLAlchemy Engine / AsyncEngine (or a callable returning one); wins over database_url.
     engine: Any = None
-    # "local" records everything and opens the dashboard to everyone; anything else
-    # applies the default filter and requires `authorization` to return True.
     environment: Optional[str] = field(default_factory=_env_environment)
+    # The dashboard is open to anyone only in these environments; everywhere else it needs a login.
+    open_environments: List[str] = field(default_factory=lambda: ["local"])
+    # These record every entry; other environments (production, ...) keep only what matters.
+    record_all_environments: List[str] = field(default_factory=lambda: [
+        "local", "dev", "development", "test", "testing", "qa", "uat", "stage", "staging",
+    ])
+    # Built-in login: ("user", "password"), {"user": "password", ...} or $TRACEFOX_USERNAME / $TRACEFOX_PASSWORD.
+    basic_auth: Any = field(default_factory=_env_basic_auth)
+    # Your own check, called with the framework's request; must return True to let the viewer in.
     authorization: Optional[Callable[[Any], bool]] = None
     watchers: Dict[str, Any] = field(default_factory=dict)
 
@@ -101,8 +113,32 @@ class TracefoxConfig:
         self.path = "/" + self.path.strip("/")
 
     @property
+    def env(self) -> str:
+        return (self.environment or "production").strip().lower()
+
+    @property
+    def dashboard_is_open(self) -> bool:
+        return self.env in {e.lower() for e in self.open_environments}
+
+    @property
+    def records_everything(self) -> bool:
+        return self.env in {e.lower() for e in self.record_all_environments}
+
+    @property
     def is_local(self) -> bool:
-        return (self.environment or "production") in ("local", "dev", "development", "debug")
+        return self.dashboard_is_open
+
+    def basic_auth_users(self) -> Dict[str, str]:
+        auth = self.basic_auth
+        if not auth:
+            return {}
+        if isinstance(auth, dict):
+            return {str(k): str(v) for k, v in auth.items()}
+        if isinstance(auth, str) and ":" in auth:
+            username, password = auth.split(":", 1)
+            return {username: password}
+        username, password = auth
+        return {str(username): str(password)}
 
     def watcher_enabled(self, name: str) -> bool:
         value = self.watchers.get(name, False)
