@@ -169,13 +169,25 @@ def find_app_frame(skip: int = 1) -> Tuple[Optional[str], Optional[int]]:
 
 
 def relative_path(filename: Optional[str]) -> Optional[str]:
-    if not filename:
+    """Project-relative path; library files from their package down (no home directories leak)."""
+    if not filename or filename.startswith("<"):
         return filename
+    if filename.startswith(_PACKAGE_DIR + os.sep):
+        return "tracefox/" + os.path.relpath(filename, _PACKAGE_DIR)
+    for marker in ("site-packages", "dist-packages"):
+        head, sep, tail = filename.rpartition(os.sep + marker + os.sep)
+        if sep:
+            return tail
     try:
         rel = os.path.relpath(filename)
-        return filename if rel.startswith("..") else rel
     except ValueError:
         return filename
+    if not rel.startswith(".."):
+        return rel
+    for root in _STDLIB_DIRS:
+        if filename.startswith(root + os.sep):
+            return os.path.relpath(filename, root)
+    return filename
 
 
 def line_preview(filename: str, lineno: int, around: int = 9) -> Dict[str, str]:

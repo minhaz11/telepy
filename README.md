@@ -27,6 +27,31 @@ It works with **FastAPI / Starlette**, **Flask** and **Django**, plus any other 
 └─────────────┘          └──────────┘          └────────┘          └──────────────┘
 ```
 
+## Screenshots
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/minhaz11/tracefox/main/docs/screenshots/requests.png" alt="TraceFox requests screen: every incoming request with method, path, status, duration and time" width="100%">
+</p>
+
+<table>
+  <tr>
+    <td width="50%"><img src="https://raw.githubusercontent.com/minhaz11/tracefox/main/docs/screenshots/request-detail.png" alt="Request detail with payload, masked password and the SQL queries it ran"></td>
+    <td width="50%"><img src="https://raw.githubusercontent.com/minhaz11/tracefox/main/docs/screenshots/exception.png" alt="Exception detail with code preview of the failing line and stack trace"></td>
+  </tr>
+  <tr>
+    <td align="center"><b>Request detail</b>: payload (password masked), headers, response, and every query, log, job and model change from that request</td>
+    <td align="center"><b>Exceptions</b>: grouped occurrences, the failing line in context, and the stack trace</td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="https://raw.githubusercontent.com/minhaz11/tracefox/main/docs/screenshots/queries-dark.png" alt="Queries screen in dark mode with a slow query highlighted"></td>
+    <td width="50%"><img src="https://raw.githubusercontent.com/minhaz11/tracefox/main/docs/screenshots/mail-dark.png" alt="Mail detail in dark mode with recipients and an HTML preview"></td>
+  </tr>
+  <tr>
+    <td align="center"><b>Queries</b>: SQL with bindings filled in, slow queries flagged (dark mode)</td>
+    <td align="center"><b>Mail</b>: recipients, subject, HTML preview and <code>.eml</code> download (dark mode)</td>
+  </tr>
+</table>
+
 ## Features
 
 Everything that Laravel Telescope does, mapped to the Python ecosystem:
