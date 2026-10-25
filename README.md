@@ -309,9 +309,13 @@ TRACEFOX_ENV=local uvicorn examples.fastapi_app:app --reload   # demo that exerc
 
 Releases go to PyPI from GitHub Actions through [Trusted Publishing](https://docs.pypi.org/trusted-publishers/), so no API token is stored.
 
-1. Bump `version` in `pyproject.toml` and commit.
-2. Tag it and push the tag: `git tag v0.1.1 && git push origin v0.1.1`.
-3. The **Publish to PyPI** workflow tests, builds, checks and uploads the release.
+`main` is protected: changes land through pull requests, and all six CI jobs (Python 3.9–3.14) must pass before merging. Direct pushes, force-pushes and deleting `main` are blocked for everyone. Release tags (`v*`) are locked once pushed, so they can't be moved or deleted.
+
+1. Open a pull request that bumps `version` in `pyproject.toml` and `__version__` in `src/tracefox/__init__.py`, and merge it once CI passes.
+2. Tag the merged commit and push the tag: `git checkout main && git pull && git tag v0.1.3 && git push origin v0.1.3`.
+3. The **Publish to PyPI** workflow checks the tag matches the version, then tests, builds and uploads the release.
+
+A tag can't be moved after it's pushed. If a release goes wrong, fix it on `main` and release the next version.
 
 ## License
 
