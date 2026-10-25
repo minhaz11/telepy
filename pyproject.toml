@@ -45,7 +45,7 @@ flask = ["flask"]
 django = ["django>=3.2"]
 dev = [
     "pytest", "fastapi", "uvicorn", "httpx", "flask", "django", "requests", "jinja2", "redis", "fakeredis",
-    "celery", "apscheduler", "click", "python-multipart",
+    "celery", "apscheduler", "click", "python-multipart", "alembic", "flask-sqlalchemy", "aiosqlite", "greenlet",
 ]
 
 [project.scripts]

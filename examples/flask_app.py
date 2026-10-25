@@ -14,10 +14,10 @@ from tracefox.integrations.flask import FlaskTracefox
 
 app = Flask(__name__)
 app.secret_key = "dev"
-app.config["TRACEFOX"] = {"database_url": "sqlite:///tracefox-flask.sqlite3"}
-FlaskTracefox(app)
+app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///demo-flask.sqlite3"
+FlaskTracefox(app)  # stores entries in SQLALCHEMY_DATABASE_URI / Flask-SQLAlchemy's database
 
-engine = create_engine("sqlite:///demo-flask.sqlite3")
+engine = create_engine(app.config["SQLALCHEMY_DATABASE_URI"])
 logger = logging.getLogger("flask-demo")
 
 

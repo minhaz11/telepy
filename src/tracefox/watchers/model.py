@@ -20,9 +20,13 @@ class ModelWatcher(Watcher):
     def _tracks(self, action: str) -> bool:
         return action in self.options.get("events", ["created", "updated", "deleted"])
 
+    @staticmethod
+    def _own(instance: Any) -> bool:
+        return getattr(getattr(instance, "_meta", None), "app_label", None) == "tracefox"
+
     @safely
     def record_action(self, action: str, instance: Any, changes: Optional[Dict[str, Any]] = None) -> None:
-        if not self.active or not self._tracks(action):
+        if not self.active or not self._tracks(action) or self._own(instance):
             return
         key = model_key(instance) or class_name(instance)
         entry = IncomingEntry(EntryType.MODEL, {
@@ -35,7 +39,7 @@ class ModelWatcher(Watcher):
 
     @safely
     def count_hydration(self, instance: Any) -> None:
-        if not self.options.get("hydrations", True) or not self.active:
+        if not self.options.get("hydrations", True) or not self.active or self._own(instance):
             return
         batch = current_batch.get()
         if batch is None:

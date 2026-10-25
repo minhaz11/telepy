@@ -68,11 +68,43 @@ def _iso(value: Optional[datetime]) -> Optional[str]:
     return value.replace(tzinfo=timezone.utc).isoformat().replace("+00:00", "Z")
 
 
+_SYNC_DRIVERS = {
+    "postgresql+asyncpg": ("postgresql+psycopg", "postgresql+psycopg2"),
+    "postgresql+psycopg_async": ("postgresql+psycopg",),
+    "mysql+aiomysql": ("mysql+pymysql", "mysql+mysqldb"),
+    "mysql+asyncmy": ("mysql+pymysql", "mysql+mysqldb"),
+    "sqlite+aiosqlite": ("sqlite",),
+    "mssql+aioodbc": ("mssql+pyodbc",),
+    "oracle+oracledb_async": ("oracle+oracledb",),
+}
+
+
+def sync_url(url: sa.engine.URL) -> sa.engine.URL:
+    """The blocking-driver twin of an async URL (the writer thread can't drive asyncpg & co.)."""
+    for candidate in _SYNC_DRIVERS.get(url.drivername, ()):
+        sync = url.set(drivername=candidate)
+        try:
+            sync.get_dialect().import_dbapi()
+        except Exception:
+            continue
+        return sync
+    raise RuntimeError(
+        f"Tracefox writes from a background thread and needs a synchronous driver for {url.drivername}. "
+        f"Install one of {', '.join(_SYNC_DRIVERS.get(url.drivername, ('a sync driver',)))} or pass database_url."
+    )
+
+
 class DatabaseStorage(Storage):
-    def __init__(self, url: str, engine_options: Optional[Dict[str, Any]] = None, auto_migrate: bool = True):
+    """SQLAlchemy storage: the application's own engine (``engine=``) or a separate ``database_url``."""
+
+    def __init__(self, url: Optional[str] = None, engine_options: Optional[Dict[str, Any]] = None,
+                 auto_migrate: bool = True, engine: Any = None):
+        if url is None and engine is None:
+            raise ValueError("DatabaseStorage needs a url or an engine")
         self.url = url
         self.engine_options = dict(engine_options or {})
         self.auto_migrate = auto_migrate
+        self._source = engine
         self._engine: Optional[sa.engine.Engine] = None
         self._pid: Optional[int] = None
         self._lock = threading.Lock()
@@ -80,25 +112,38 @@ class DatabaseStorage(Storage):
 
     @property
     def engine(self) -> sa.engine.Engine:
-        if self._engine is None or self._pid != os.getpid():
+        if self._engine is None or (self._pid != os.getpid() and self._source is None):
             with self._lock:
-                if self._engine is None or self._pid != os.getpid():
+                if self._engine is None or (self._pid != os.getpid() and self._source is None):
                     if self._engine is not None:
                         self._engine.dispose(close=False)
-                    self._engine = self._create_engine()
+                    self._engine = self._resolve_engine()
                     self._pid = os.getpid()
                     if self.auto_migrate and not self._migrated:
                         self.migrate()
         return self._engine
 
-    def _create_engine(self) -> sa.engine.Engine:
+    def _resolve_engine(self) -> sa.engine.Engine:
+        if self._source is None:
+            return self._create_engine(self.url)
+        engine = self._source() if callable(self._source) and not isinstance(self._source, sa.engine.Engine) else self._source
+        sync_engine = getattr(engine, "sync_engine", None)
+        if sync_engine is not None:
+            # An AsyncEngine: same database, but through a blocking driver owned by Tracefox.
+            return self._create_engine(sync_url(engine.url).render_as_string(hide_password=False))
+        if not isinstance(engine, sa.engine.Engine):
+            raise TypeError(f"Tracefox engine must be a SQLAlchemy Engine or AsyncEngine, got {type(engine).__name__}")
+        # The app's own engine: Tracefox's queries are skipped because they run with recording suspended.
+        return engine
+
+    def _create_engine(self, url_string: str) -> sa.engine.Engine:
         options = dict(self.engine_options)
-        url = sa.engine.make_url(self.url)
+        url = sa.engine.make_url(url_string)
         if url.get_backend_name() == "sqlite":
             options.setdefault("connect_args", {}).setdefault("check_same_thread", False)
             if url.database in (None, "", ":memory:"):
                 options.setdefault("poolclass", sa.pool.StaticPool)
-        engine = sa.create_engine(self.url, **options)
+        engine = sa.create_engine(url, **options)
         engine._tracefox_storage = True
         if url.get_backend_name() == "sqlite":
             @sa.event.listens_for(engine, "connect")
@@ -116,7 +161,8 @@ class DatabaseStorage(Storage):
         return engine is not None and engine is self._engine
 
     def reset_after_fork(self) -> None:
-        self._engine = None
+        if self._source is None:
+            self._engine = None
 
     def migrate(self) -> None:
         engine = self._engine if self._engine is not None else self.engine

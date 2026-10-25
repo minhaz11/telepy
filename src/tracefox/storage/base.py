@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import functools
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Dict, Iterable, List, Optional
 
+from ..context import suspended
 from ..entry import EntryUpdate, IncomingEntry
 
 
@@ -19,8 +21,29 @@ class EntryQueryOptions:
     limit: int = 50
 
 
+def _quiet(fn):
+    @functools.wraps(fn)
+    def wrapper(*args, **kwargs):
+        token = suspended.set(True)
+        try:
+            return fn(*args, **kwargs)
+        finally:
+            suspended.reset(token)
+    return wrapper
+
+
 class Storage(ABC):
-    """Persistence for entries, tags, monitored tags and recording state."""
+    """Persistence for entries, tags, monitored tags and recording state.
+
+    Every public method runs with recording suspended, so storage queries on a shared
+    (application) database never show up as entries themselves.
+    """
+
+    def __init_subclass__(cls, **kwargs):
+        super().__init_subclass__(**kwargs)
+        for name, value in list(vars(cls).items()):
+            if callable(value) and not name.startswith("_") and not isinstance(value, (staticmethod, classmethod, type)):
+                setattr(cls, name, _quiet(value))
 
     @abstractmethod
     def migrate(self) -> None: ...

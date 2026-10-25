@@ -26,7 +26,7 @@ if not settings.configured:
             "BACKEND": "django.template.backends.django.DjangoTemplates",
             "OPTIONS": {"loaders": [("django.template.loaders.locmem.Loader", {"hello.html": "Hi {{ name }}"})]},
         }],
-        TRACEFOX={"database_url": "sqlite://", "async_writes": False},
+        TRACEFOX={"async_writes": False},
         USE_TZ=True,
     )
     django.setup()
@@ -42,6 +42,7 @@ from django.test import Client  # noqa: E402
 from django.urls import include, path  # noqa: E402
 
 from tracefox import EntryType  # noqa: E402
+from tracefox.integrations.django.models import Entry, MonitoredTag, Setting  # noqa: E402
 
 order_placed = Signal()
 
@@ -79,7 +80,14 @@ urlpatterns = [
 
 @pytest.fixture
 def client(tracefox):
+    from tracefox.integrations.django.storage import DjangoStorage
+
     call_command("migrate", run_syncdb=True, verbosity=0)
+    tracefox.storage = DjangoStorage()
+    tracefox.storage.clear()
+    with tracefox.without_recording():
+        MonitoredTag.objects.all().delete()
+        Setting.objects.all().delete()
     return Client(raise_request_exception=False)
 
 
@@ -143,3 +151,30 @@ def test_management_commands(client, entries):
     assert command["exit_code"] == 0
     call_command("tracefox_clear", stdout=__import__("io").StringIO())
     assert entries(EntryType.COMMAND) == []
+
+
+def test_entries_are_stored_in_the_project_database(client, entries, tracefox):
+    from django.db import connection
+
+    client.get("/hello/ada/")
+    tables = set(connection.introspection.table_names())
+    assert {"tracefox_entries", "tracefox_entries_tags", "tracefox_monitoring", "tracefox_settings"} <= tables
+    with tracefox.without_recording():
+        assert Entry.objects.filter(type=EntryType.REQUEST).count() == 1
+    assert [q["content"]["sql"] for q in entries(EntryType.QUERY) if "tracefox_" in q["content"]["sql"]] == []
+    assert not [m for m in entries(EntryType.MODEL) if "tracefox" in m["content"]["model"]]
+
+
+def test_app_config_uses_the_default_connection(tracefox):
+    from django.apps import apps
+
+    from tracefox.integrations.django.storage import DjangoStorage
+
+    tracefox._storage = None
+    apps.get_app_config("tracefox").ready()
+    assert isinstance(tracefox.storage, DjangoStorage)
+    assert tracefox.storage.using == "default"
+
+
+def test_shipped_migrations_match_the_models(tracefox):
+    call_command("makemigrations", "tracefox", check=True, dry_run=True, verbosity=0)

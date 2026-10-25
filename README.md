@@ -71,7 +71,7 @@ pip install tracefox            # core (SQLAlchemy is the only dependency)
 pip install "tracefox[fastapi]" # or [flask] / [django]
 ```
 
-Entries are stored with SQLAlchemy, so any database it supports works. The default is a local SQLite file (`tracefox.sqlite3`). Tables are created automatically.
+Like Laravel Telescope, TraceFox keeps its entries in **your application's own database**. Its migrations add four tables: `tracefox_entries`, `tracefox_entries_tags`, `tracefox_monitoring` and `tracefox_settings`. See [Database & migrations](#database--migrations).
 
 ## Quick start
 
@@ -79,21 +79,26 @@ Entries are stored with SQLAlchemy, so any database it supports works. The defau
 
 ```python
 from fastapi import FastAPI
+from sqlalchemy import create_engine
 from tracefox.integrations.fastapi import init_tracefox
 
+engine = create_engine(DATABASE_URL)   # your app's engine (an AsyncEngine works too)
+
 app = FastAPI(debug=True)
-init_tracefox(app)            # middleware + dashboard at /tracefox
+init_tracefox(app, engine=engine)      # middleware + dashboard at /tracefox, entries in your database
 ```
 
 ### Flask
 
 ```python
 from flask import Flask
+from flask_sqlalchemy import SQLAlchemy
 from tracefox.integrations.flask import FlaskTracefox
 
 app = Flask(__name__)
-app.config["TRACEFOX"] = {"database_url": "sqlite:///tracefox.sqlite3"}
-FlaskTracefox(app)            # middleware + dashboard + `flask tracefox prune|clear|pause|resume`
+app.config["SQLALCHEMY_DATABASE_URI"] = "postgresql://..."
+db = SQLAlchemy(app)
+FlaskTracefox(app)            # uses Flask-SQLAlchemy's database; dashboard + `flask tracefox prune|clear|pause|resume`
 ```
 
 ### Django
@@ -108,6 +113,10 @@ TRACEFOX = {
 
 # urls.py
 urlpatterns += [path("tracefox/", include("tracefox.integrations.django.urls"))]
+```
+
+```bash
+python manage.py migrate      # creates the tracefox tables in your default database
 ```
 
 Management commands: `tracefox_prune [--hours 48] [--keep-exceptions]`, `tracefox_clear`, `tracefox_pause`, `tracefox_resume`.
@@ -126,6 +135,38 @@ asgi_app = TracefoxMiddleware(asgi_app)                 # record requests
 
 Open **http://localhost:8000/tracefox**.
 
+## Database & migrations
+
+TraceFox works the way Laravel Telescope does: it stores entries next to your data, in your application's database, and creates its tables with migrations.
+
+| Stack | Where entries go | How the tables are created |
+|---|---|---|
+| **Django** | the `default` database (or `TRACEFOX = {"connection": "analytics"}`) | shipped migrations: `python manage.py migrate` |
+| **Flask + Flask-SQLAlchemy** | Flask-SQLAlchemy's engine, detected automatically (`SQLALCHEMY_DATABASE_URI` also works) | Flask-Migrate: `tracefox install` → `flask db upgrade`, or created on first use |
+| **FastAPI / Starlette / SQLAlchemy** | the engine you pass: `init_tracefox(app, engine=engine)` | Alembic: `tracefox install` → `alembic upgrade head`, or created on first use |
+| **No app database** | `database_url`, defaulting to a local `tracefox.sqlite3` | created on first use |
+
+**Alembic / Flask-Migrate.** This is the counterpart of `php artisan telescope:install`:
+
+```bash
+tracefox install            # writes migrations/versions/<rev>_create_tracefox_tables.py on top of your current head
+alembic upgrade head        # or: flask db upgrade
+```
+
+Then keep `--autogenerate` from proposing to drop the tables. In `env.py`:
+
+```python
+from tracefox.integrations.alembic import include_object
+
+context.configure(connection=connection, target_metadata=target_metadata, include_object=include_object)
+```
+
+If migrations own your schema, pass `auto_migrate=False` so TraceFox never creates tables by itself. The migration is safe to run either way: it skips tables that already exist.
+
+**Async apps.** If you pass an `AsyncEngine` (asyncpg, aiomysql, aiosqlite…), TraceFox writes to the same database through the matching blocking driver (psycopg / psycopg2, PyMySQL, sqlite3), because its writer runs on a background thread. Install that driver alongside your async one.
+
+**Own queries are invisible.** TraceFox suspends recording while it reads or writes its tables, so they never show up on the Queries or Models screens.
+
 ## Configuration
 
 Options are passed as keyword arguments to `init_tracefox(app, ...)` / `FlaskTracefox(app, ...)` / `tracefox.start(...)`, through Flask's `app.config["TRACEFOX"]`, or through Django's `TRACEFOX = {...}`.
@@ -135,7 +176,10 @@ Options are passed as keyword arguments to `init_tracefox(app, ...)` / `FlaskTra
 | `enabled` | `$TRACEFOX_ENABLED` or `True` | master switch |
 | `environment` | `$TRACEFOX_ENV` / `$APP_ENV`; otherwise `local` when the framework is in debug mode, else `production` | `local` records everything and opens the dashboard |
 | `path` | `/tracefox` | dashboard URL |
-| `database_url` | `$TRACEFOX_DATABASE_URL` or `sqlite:///tracefox.sqlite3` | any SQLAlchemy URL |
+| `engine` | Flask-SQLAlchemy's engine when present | your app's SQLAlchemy `Engine` / `AsyncEngine`, or a callable returning one |
+| `connection` (Django) | `"default"` | which `DATABASES` alias holds the tracefox tables |
+| `database_url` | `$TRACEFOX_DATABASE_URL`, else `sqlite:///tracefox.sqlite3` when no app database is given | a separate SQLAlchemy URL, if you'd rather not share the app database |
+| `auto_migrate` | `True` | create missing tracefox tables on first use (SQLAlchemy only; Django uses `migrate`) |
 | `authorization` | `None` | `callable(request) -> bool`; receives the framework's request object |
 | `watchers` | all enabled | e.g. `{"queries": {"slow": 50}, "redis": False, "logs": {"level": "WARNING"}}` |
 | `ignore_paths` / `only_paths` | static assets ignored | glob patterns for request recording |
@@ -215,9 +259,10 @@ tracefox prune --hours 48 --keep-exceptions
 tracefox clear
 tracefox pause | resume
 tracefox --database-url postgresql://... migrate
+tracefox install                                   # add the Alembic / Flask-Migrate migration
 ```
 
-Run `prune` on a schedule, as Laravel's docs recommend, or set `auto_prune_hours`.
+Django has the same commands under `manage.py`: `tracefox_prune`, `tracefox_clear`, `tracefox_pause`, `tracefox_resume`. Run `prune` on a schedule, as Laravel's docs recommend, or set `auto_prune_hours`.
 
 ## How it works
 

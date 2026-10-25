@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+import os
 from typing import Any, Dict, Optional
 
 from ..core import Tracefox, tracefox as default_tracefox
@@ -39,6 +40,23 @@ def _flask_user() -> Optional[Dict[str, Any]]:
     return None
 
 
+def _uses_sqlalchemy(app: Any) -> bool:
+    return "sqlalchemy" in app.extensions or bool(app.config.get("SQLALCHEMY_DATABASE_URI")) \
+        or "flask_sqlalchemy" in __import__("sys").modules
+
+
+def _app_engine(app: Any, fallback_url: str) -> Any:
+    """Flask-SQLAlchemy's engine (resolved on first use, so init order doesn't matter)."""
+    ext = app.extensions.get("sqlalchemy")
+    if ext is not None:
+        db = getattr(ext, "db", ext)  # Flask-SQLAlchemy 2.x stores a state object
+        with app.app_context():
+            return db.engine
+    import sqlalchemy as sa
+
+    return sa.create_engine(app.config.get("SQLALCHEMY_DATABASE_URI") or fallback_url)
+
+
 class FlaskTracefox:
     def __init__(self, app: Any = None, tracefox: Optional[Tracefox] = None, **options: Any):
         self.tracefox = tracefox or default_tracefox
@@ -53,6 +71,10 @@ class FlaskTracefox:
         options = {**{k.lower(): v for k, v in (app.config.get("TRACEFOX") or {}).items()}, **self.options}
         if "environment" not in options and tracefox.config.environment is None:
             options["environment"] = "local" if app.debug else "production"
+        if not {"engine", "database_url"} & set(options) and tracefox.config.engine is None \
+                and not os.getenv("TRACEFOX_DATABASE_URL") and _uses_sqlalchemy(app):
+            # Like Laravel Telescope: store entries in the application's own database.
+            options["engine"] = lambda: _app_engine(app, tracefox.config.database_url)
         tracefox.start(**options)
         app.extensions["tracefox"] = self
         if not tracefox.config.enabled:

@@ -5,10 +5,11 @@ import os
 from django.apps import AppConfig
 
 
-class PyTracefoxConfig(AppConfig):
+class TracefoxAppConfig(AppConfig):
     name = "tracefox.integrations.django"
     label = "tracefox"
-    verbose_name = "Tracefox"
+    verbose_name = "TraceFox"
+    default_auto_field = "django.db.models.BigAutoField"
 
     def ready(self) -> None:
         from django.conf import settings
@@ -19,10 +20,12 @@ class PyTracefoxConfig(AppConfig):
         options = {k.lower(): v for k, v in (getattr(settings, "TRACEFOX", None) or {}).items()}
         if "environment" not in options and tracefox.config.environment is None:
             options["environment"] = "local" if settings.DEBUG else "production"
-        if "database_url" not in options and not os.getenv("TRACEFOX_DATABASE_URL"):
-            base_dir = getattr(settings, "BASE_DIR", None)
-            if base_dir:
-                options["database_url"] = f"sqlite:///{os.path.join(str(base_dir), 'tracefox.sqlite3')}"
+        connection = options.pop("connection", "default")
+        if "database_url" not in options and "engine" not in options and not os.getenv("TRACEFOX_DATABASE_URL"):
+            # Like Laravel Telescope: entries live in the project's own database (tables from `manage.py migrate`).
+            from .storage import DjangoStorage
+
+            tracefox.storage = DjangoStorage(using=connection)
         tracefox.start(**options)
 
         def on_exception(sender, request=None, **kwargs):

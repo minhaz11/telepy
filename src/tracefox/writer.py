@@ -75,6 +75,9 @@ class Writer:
                 self._retry_deferred()
                 continue
             try:
+                prepare = getattr(self.tracefox.storage, "prepare_thread", None)
+                if prepare is not None:
+                    prepare()
                 if job is not None:
                     self._write(job)
                 self._maybe_prune()

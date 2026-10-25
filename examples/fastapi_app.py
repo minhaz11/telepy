@@ -19,10 +19,9 @@ from tracefox.integrations.fastapi import init_tracefox
 
 logger = logging.getLogger("demo")
 
-app = FastAPI(debug=True, title="Tracefox demo")
-init_tracefox(app, database_url="sqlite:///tracefox-demo.sqlite3")
-
+app = FastAPI(debug=True, title="TraceFox demo")
 engine = create_engine("sqlite:///demo-app.sqlite3")
+init_tracefox(app, engine=engine)  # entries live in the app's own database
 
 
 class Base(DeclarativeBase):

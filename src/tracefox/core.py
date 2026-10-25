@@ -42,9 +42,10 @@ class Tracefox:
     def storage(self) -> Storage:
         if self._storage is None:
             self._storage = DatabaseStorage(
-                self.config.database_url,
+                None if self.config.engine is not None else self.config.database_url,
                 engine_options=self.config.database_engine_options,
                 auto_migrate=self.config.auto_migrate,
+                engine=self.config.engine,
             )
         return self._storage
 
@@ -53,9 +54,9 @@ class Tracefox:
         self._storage = value
 
     def configure(self, **options: Any) -> "Tracefox":
-        old_url = self.config.database_url
+        old = (self.config.database_url, self.config.engine)
         self.config.update(**options)
-        if self.config.database_url != old_url and isinstance(self._storage, DatabaseStorage):
+        if (self.config.database_url, self.config.engine) != old and isinstance(self._storage, DatabaseStorage):
             self._storage = None
         return self
 

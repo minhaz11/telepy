@@ -58,6 +58,8 @@ class TracefoxConfig:
     database_url: str = field(
         default_factory=lambda: os.getenv("TRACEFOX_DATABASE_URL", "sqlite:///tracefox.sqlite3")
     )
+    # The application's own SQLAlchemy Engine / AsyncEngine (or a callable returning one); wins over database_url.
+    engine: Any = None
     # "local" records everything and opens the dashboard to everyone; anything else
     # applies the default filter and requires `authorization` to return True.
     environment: Optional[str] = field(default_factory=_env_environment)
