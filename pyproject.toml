@@ -35,9 +35,9 @@ classifiers = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/minhaz11/telepy"
-Repository = "https://github.com/minhaz11/telepy"
-Issues = "https://github.com/minhaz11/telepy/issues"
+Homepage = "https://github.com/minhaz11/tracefox"
+Repository = "https://github.com/minhaz11/tracefox"
+Issues = "https://github.com/minhaz11/tracefox/issues"
 
 [project.optional-dependencies]
 fastapi = ["fastapi"]

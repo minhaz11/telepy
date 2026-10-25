@@ -1,6 +1,6 @@
 # tracefox
 
-[![PyPI](https://img.shields.io/pypi/v/tracefox)](https://pypi.org/project/tracefox/) [![CI](https://github.com/minhaz11/telepy/actions/workflows/ci.yml/badge.svg)](https://github.com/minhaz11/telepy/actions/workflows/ci.yml) [![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+[![PyPI](https://img.shields.io/pypi/v/tracefox)](https://pypi.org/project/tracefox/) [![CI](https://github.com/minhaz11/tracefox/actions/workflows/ci.yml/badge.svg)](https://github.com/minhaz11/tracefox/actions/workflows/ci.yml) [![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
 An elegant debug assistant for Python web apps, modelled on Laravel Telescope. It records the requests coming into your app, plus the exceptions, logs, database queries, ORM model changes, queued jobs, mail, notifications, cache operations, Redis commands, scheduled tasks, outgoing HTTP calls, template renders and variable dumps behind them. All of it appears in a Telescope-style dashboard.
 
