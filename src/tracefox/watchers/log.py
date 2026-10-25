@@ -4,7 +4,7 @@ import logging
 from typing import Any, Dict
 
 from ..entry import EntryType, IncomingEntry
-from ..utils import to_jsonable
+from ..utils import relative_path, to_jsonable
 from .base import Watcher
 
 _STANDARD_ATTRS = set(vars(logging.LogRecord("", 0, "", 0, "", (), None))) | {"message", "asctime", "taskName"}
@@ -79,7 +79,7 @@ class LogWatcher(Watcher):
             "message": record.getMessage(),
             "channel": record.name,
             "context": context,
-            "location": f"{record.pathname}:{record.lineno}",
+            "location": f"{relative_path(record.pathname)}:{record.lineno}",
         })
         if level in ("error", "critical"):
             entry.add_tags([level])
