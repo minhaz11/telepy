@@ -226,11 +226,11 @@ class Dashboard:
         return _json({"message": "Not found."}, 404)
 
 
-FORBIDDEN_PAGE = """<!doctype html><html><head><meta charset="utf-8"><title>Tracefox - Forbidden</title>
+FORBIDDEN_PAGE = """<!doctype html><html><head><meta charset="utf-8"><title>TraceFox - Forbidden</title>
 <style>body{font-family:system-ui,sans-serif;background:#f3f4f6;color:#111827;display:flex;align-items:center;
 justify-content:center;height:100vh;margin:0}.card{background:#fff;padding:2rem 2.5rem;border-radius:12px;
 box-shadow:0 1px 3px rgba(0,0,0,.1);max-width:520px}code{background:#eef;padding:.1rem .35rem;border-radius:4px}</style>
-</head><body><div class="card"><h2>403 &mdash; Tracefox is locked</h2>
+</head><body><div class="card"><h2>403 &mdash; TraceFox is locked</h2>
 <p>The dashboard is only open in the <code>local</code> environment. Set <code>TRACEFOX_ENV=local</code>
 for development, or pass an <code>authorization</code> callback that returns <code>True</code> for allowed users.</p>
 </div></body></html>"""

@@ -157,10 +157,7 @@
     }
 
     function logo() {
-        var span = document.createElement('span');
-        span.style.display = 'contents';
-        span.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3.2 11.2 15.4 5.6l2 4.4-12.2 5.6z" fill="currentColor" fill-opacity=".15"/><path d="m15.4 5.6 3.4-1.5 2 4.4-3.4 1.5"/><path d="M1.6 12l1.6-.8 2 4.4-1.6.8z"/><path d="M10.4 13.4 7 21.5M11.6 12.9l3.4 8.6M11 13.2v8.3"/></svg>';
-        return span.firstChild;
+        return h('img', {src: BASE + '/static/logo.png', alt: '', width: '36', height: '36'});
     }
 
     // ------------------------------------------------------------------ json viewer
@@ -782,7 +779,7 @@
         main = h('main', {class: 'content'});
         root.replaceChildren(h('div', {class: 'container'},
             h('header', {class: 'header'},
-                link('/requests', [logo(), 'Tracefox', h('small', {}, 'v' + (CONFIG.version || ''))], {class: 'logo'}),
+                link('/requests', [logo(), h('span', {class: 'wordmark'}, 'Trace', h('span', {class: 'fox'}, 'Fox')), h('small', {}, 'v' + (CONFIG.version || ''))], {class: 'logo', 'aria-label': 'TraceFox'}),
                 h('div', {class: 'header-actions'},
                     recordButton,
                     h('button', {class: 'icon-btn', type: 'button', title: 'Clear all entries', onclick: clearEntries}, icon('trash')),
@@ -824,7 +821,7 @@
     }
 
     function clearEntries() {
-        if (!window.confirm('Are you sure you want to delete all Tracefox entries?')) return;
+        if (!window.confirm('Are you sure you want to delete all TraceFox entries?')) return;
         api('/entries', {method: 'DELETE', body: '{}'}).then(function () { refreshCounts(); render(); });
     }
 
@@ -885,7 +882,7 @@
         if (slug === 'monitored-tags') { main.replaceChildren(monitoringPage()); return; }
         var def = TYPE_BY_SLUG[slug];
         if (!def) { main.replaceChildren(card('Not Found', h('div', {class: 'empty'}, 'This page does not exist.'))); return; }
-        document.title = 'Tracefox - ' + def.label;
+        document.title = 'TraceFox - ' + def.label;
         main.replaceChildren(parts[1] ? detailPage(def, parts[1]) : indexPage(def, params));
     }
 
@@ -959,13 +956,13 @@
         }
 
         function showError(error) {
-            body.replaceChildren(h('div', {class: 'empty'}, error.status === 403 ? 'You are not authorized to view Tracefox.' : 'Something went wrong: ' + error.message));
+            body.replaceChildren(h('div', {class: 'empty'}, error.status === 403 ? 'You are not authorized to view TraceFox.' : 'Something went wrong: ' + error.message));
         }
 
         function draw(status) {
             var nodes = [];
             if (!enabled(def)) nodes.push(h('div', {class: 'notice'}, 'The ' + def.label + ' watcher is disabled in your configuration.'));
-            else if (status === 'paused' || !state.recording) nodes.push(h('div', {class: 'notice'}, 'Tracefox is currently paused. New entries will not be recorded.'));
+            else if (status === 'paused' || !state.recording) nodes.push(h('div', {class: 'notice'}, 'TraceFox is currently paused. New entries will not be recorded.'));
             if (!entries.length) {
                 nodes.push(h('div', {class: 'empty'}, icon(def.icon), "We didn't find anything — just empty space."));
                 body.replaceChildren.apply(body, nodes);
@@ -1050,7 +1047,7 @@
     // ------------------------------------------------------------------ monitoring
 
     function monitoringPage() {
-        document.title = 'Tracefox - Monitoring';
+        document.title = 'TraceFox - Monitoring';
         var list = h('div', {}, h('div', {class: 'empty'}, h('div', {class: 'spinner'})));
         var input = h('input', {type: 'text', placeholder: 'Tag to monitor, e.g. Auth:1 or app.models.User:42'});
 

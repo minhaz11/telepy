@@ -1,8 +1,22 @@
-# tracefox
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/minhaz11/tracefox/main/docs/logo-dark.png">
+    <img src="https://raw.githubusercontent.com/minhaz11/tracefox/main/docs/logo.png" alt="TraceFox — trace, monitor, debug" width="560">
+  </picture>
+</p>
 
-[![PyPI](https://img.shields.io/pypi/v/tracefox)](https://pypi.org/project/tracefox/) [![CI](https://github.com/minhaz11/tracefox/actions/workflows/ci.yml/badge.svg)](https://github.com/minhaz11/tracefox/actions/workflows/ci.yml) [![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+<p align="center">
+  <a href="https://pypi.org/project/tracefox/"><img src="https://img.shields.io/pypi/v/tracefox" alt="PyPI"></a>
+  <a href="https://pypi.org/project/tracefox/"><img src="https://img.shields.io/pypi/pyversions/tracefox" alt="Python versions"></a>
+  <a href="https://github.com/minhaz11/tracefox/actions/workflows/ci.yml"><img src="https://github.com/minhaz11/tracefox/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://github.com/minhaz11/tracefox/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="License: MIT"></a>
+</p>
 
 An elegant debug assistant for Python web apps, modelled on Laravel Telescope. It records the requests coming into your app, plus the exceptions, logs, database queries, ORM model changes, queued jobs, mail, notifications, cache operations, Redis commands, scheduled tasks, outgoing HTTP calls, template renders and variable dumps behind them. All of it appears in a Telescope-style dashboard.
+
+```bash
+pip install tracefox
+```
 
 It works with **FastAPI / Starlette**, **Flask** and **Django**, plus any other ASGI or WSGI framework.
 
@@ -231,4 +245,4 @@ Releases go to PyPI from GitHub Actions through [Trusted Publishing](https://doc
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT — see [LICENSE](https://github.com/minhaz11/tracefox/blob/main/LICENSE).
