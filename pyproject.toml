@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "tracefox"
-version = "0.1.1"
+version = "0.1.2"
 description = "An elegant debug assistant for Python web apps (FastAPI, Flask, Django, any ASGI/WSGI), inspired by Laravel Telescope."
 readme = "README.md"
 requires-python = ">=3.9"

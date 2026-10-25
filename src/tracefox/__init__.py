@@ -6,7 +6,7 @@ from .config import TracefoxConfig
 from .core import Tracefox, tracefox
 from .entry import EntryType, EntryUpdate, IncomingEntry
 
-__version__ = "0.1.1"
+__version__ = "0.1.2"
 
 
 def dump(*values: Any) -> Any:
