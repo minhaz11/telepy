@@ -956,7 +956,7 @@
         }
 
         function showError(error) {
-            body.replaceChildren(h('div', {class: 'empty'}, error.status === 403 ? 'You are not authorized to view TraceFox.' : 'Something went wrong: ' + error.message));
+            body.replaceChildren(h('div', {class: 'empty'}, error.status === 401 ? 'Login required. Reload the page to sign in.' : error.status === 403 ? 'You are not authorized to view TraceFox.' : 'Something went wrong: ' + error.message));
         }
 
         function draw(status) {

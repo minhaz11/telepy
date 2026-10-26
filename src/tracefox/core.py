@@ -244,7 +244,7 @@ class Tracefox:
         if not entries:
             return []
         monitored = self.monitored_tags()
-        if self.config.default_filter and not self.config.is_local:
+        if self.config.default_filter and not self.config.records_everything:
             entries = [
                 e for e in entries
                 if e.is_reportable_exception() or e.is_failed_request() or e.is_failed_job()

@@ -83,10 +83,10 @@ Plus the rest of Telescope's machinery:
 - **Tags.** Tags are added automatically: `Auth:<id>`, model keys like `app.models.User:1`, `slow`, `failed` and mail recipients. You can add your own with `tracefox.tag(...)` and search by tag on every screen.
 - **Monitoring.** Entries with a monitored tag are always recorded, even when filters would drop them.
 - **Exception families.** Repeats of the same exception collapse into one row with an occurrence count and an "other occurrences" view.
-- **Filtering.** Outside `local`, a default filter keeps only failed requests, exceptions, failed jobs, scheduled tasks, slow queries and monitored tags. You can add `tracefox.filter(...)` / `tracefox.filter_batch(...)`.
+- **Filtering.** Local, dev, test, UAT and staging environments record everything. In production (and any environment not on that list), a default filter keeps only failed requests, exceptions, failed jobs, scheduled tasks, slow queries and monitored tags. You can add `tracefox.filter(...)` / `tracefox.filter_batch(...)`.
 - **Privacy.** Sensitive request headers and parameters are masked as `********`. `password`, `authorization` and `cookie` are masked by default, and the lists are configurable.
 - **Pause / resume recording, clear all entries, light / dark / system theme, live "Load New Entries", pruning.**
-- **Safe by default.** The dashboard returns 403 outside `local` unless you pass an `authorization` callback. Every write needs a custom header, which blocks CSRF. Watchers never raise into your app.
+- **Safe by default.** The dashboard is open only in `local`; everywhere else it needs a login (see [Dashboard access](#dashboard-access)). Every write needs a custom header, which blocks CSRF. Watchers never raise into your app.
 - **Low overhead.** Entries are buffered per batch and written on a background thread. Libraries are hooked only if your app imports them, through import hooks.
 
 ## Install
@@ -192,6 +192,52 @@ If migrations own your schema, pass `auto_migrate=False` so TraceFox never creat
 
 **Own queries are invisible.** TraceFox suspends recording while it reads or writes its tables, so they never show up on the Queries or Models screens.
 
+## Dashboard access
+
+The environment name decides who can open the dashboard. TraceFox reads it from `TRACEFOX_ENV`, then `APP_ENV`, `ENVIRONMENT` and `ENV`; if none is set, it uses `local` when your framework runs in debug mode and `production` otherwise.
+
+| Environment | Login needed? | What is recorded |
+|---|---|---|
+| `local` | no | everything |
+| `dev`, `development`, `test`, `qa`, `uat`, `stage`, `staging` | **yes** | everything |
+| `production` and anything else | **yes** | exceptions, failed requests and jobs, slow queries, scheduled tasks, monitored tags |
+
+Outside `local`, the dashboard stays locked (403) until you choose how people log in.
+
+**1. Username and password** (works with every framework). Set two environment variables on the server:
+
+```bash
+TRACEFOX_ENV=staging
+TRACEFOX_USERNAME=admin
+TRACEFOX_PASSWORD='a-long-random-password'
+```
+
+The browser shows a login prompt (HTTP Basic auth) when you open `/tracefox`. You can also set it in code, for one or several people:
+
+```python
+init_tracefox(app, basic_auth=("admin", os.environ["TRACEFOX_PASSWORD"]))
+init_tracefox(app, basic_auth={"ada": "…", "grace": "…"})
+```
+
+Serve the dashboard over HTTPS so the password isn't sent in clear text. Behind Apache `mod_wsgi`, enable `WSGIPassAuthorization On` so the login header reaches the app.
+
+**2. Your app's own login** (like Laravel's `viewTelescope` gate). Pass a callback; it receives your framework's request and returns `True` for people allowed in:
+
+```python
+# Django: staff users who are logged in to your site
+TRACEFOX = {"authorization": lambda request: request.user.is_authenticated and request.user.is_staff}
+
+# Flask (Flask-Login)
+FlaskTracefox(app, authorization=lambda request: current_user.is_authenticated and current_user.is_admin)
+
+# FastAPI / Starlette: anything you can check on the request, e.g. a session cookie or an internal network
+init_tracefox(app, authorization=lambda request: request.session.get("role") == "admin")
+```
+
+If you set both, a viewer needs the username and password **and** must pass the callback.
+
+To change which environments are open or record everything, use `open_environments` and `record_all_environments`. For example, `open_environments=["local", "dev"]` drops the login on a private dev box.
+
 ## Configuration
 
 Options are passed as keyword arguments to `init_tracefox(app, ...)` / `FlaskTracefox(app, ...)` / `tracefox.start(...)`, through Flask's `app.config["TRACEFOX"]`, or through Django's `TRACEFOX = {...}`.
@@ -199,18 +245,21 @@ Options are passed as keyword arguments to `init_tracefox(app, ...)` / `FlaskTra
 | Option | Default | |
 |---|---|---|
 | `enabled` | `$TRACEFOX_ENABLED` or `True` | master switch |
-| `environment` | `$TRACEFOX_ENV` / `$APP_ENV`; otherwise `local` when the framework is in debug mode, else `production` | `local` records everything and opens the dashboard |
+| `environment` | `$TRACEFOX_ENV` / `$APP_ENV` / `$ENVIRONMENT` / `$ENV`; otherwise `local` when the framework is in debug mode, else `production` | decides dashboard access and what gets recorded |
+| `open_environments` | `["local"]` | environments where the dashboard needs no login |
+| `record_all_environments` | `local`, `dev`, `development`, `test`, `testing`, `qa`, `uat`, `stage`, `staging` | environments that record every entry; others use the default filter |
+| `basic_auth` | `$TRACEFOX_USERNAME` + `$TRACEFOX_PASSWORD` | built-in login: `("user", "password")`, `{"user": "password", ...}` or `"user:password"` |
 | `path` | `/tracefox` | dashboard URL |
 | `engine` | Flask-SQLAlchemy's engine when present | your app's SQLAlchemy `Engine` / `AsyncEngine`, or a callable returning one |
 | `connection` (Django) | `"default"` | which `DATABASES` alias holds the tracefox tables |
 | `database_url` | `$TRACEFOX_DATABASE_URL`, else `sqlite:///tracefox.sqlite3` when no app database is given | a separate SQLAlchemy URL, if you'd rather not share the app database |
 | `auto_migrate` | `True` | create missing tracefox tables on first use (SQLAlchemy only; Django uses `migrate`) |
-| `authorization` | `None` | `callable(request) -> bool`; receives the framework's request object |
+| `authorization` | `None` | `callable(request) -> bool`; receives the framework's request object (combined with `basic_auth` when both are set) |
 | `watchers` | all enabled | e.g. `{"queries": {"slow": 50}, "redis": False, "logs": {"level": "WARNING"}}` |
 | `ignore_paths` / `only_paths` | static assets ignored | glob patterns for request recording |
 | `hidden_request_headers` / `hidden_request_parameters` / `hidden_response_parameters` | auth headers, cookies, passwords, tokens | masked as `********` |
 | `user_resolver` | framework default | `callable(request) -> {"id", "name", "email"}` |
-| `default_filter` | `True` | apply the production filter outside `local` |
+| `default_filter` | `True` | apply the production filter outside `record_all_environments` |
 | `async_writes` | `True` | write on a background thread (set `False` in tests) |
 | `auto_prune_hours` | `None` | prune automatically every hour, keeping N hours |
 
